@@ -137,6 +137,15 @@ export const messages = {
     },
     chat: {
       thinking: "考えています",
+      welcomeTitle: "Open Cowork",
+      welcomeBody:
+        "新しいタスクを開始して、Claude と作業を始めましょう。\n資料作成、情報の調査、文章の要約、メール下書きなど、さまざまなタスクをお願いできます。",
+      skillsHeader: "使えるスキル",
+      skillsHint: "クリックして入力欄に挿入",
+      skillsUse: "使う",
+      skillsEmpty: "利用できるスキルはまだありません",
+      skillsGroupPersonal: "個人用",
+      skillsGroupCommon: "共通",
       promptPlaceholder: "Claude にメッセージを送信...",
       promptHint: "Enter で送信、Shift+Enter で改行",
       send: "送信",
@@ -362,6 +371,15 @@ export const messages = {
     },
     chat: {
       thinking: "Thinking",
+      welcomeTitle: "Open Cowork",
+      welcomeBody:
+        "Start a new task to work with Claude.\nAsk me to draft documents, research a topic, summarize content, write emails, and more.",
+      skillsHeader: "Available skills",
+      skillsHint: "Click to insert into the prompt",
+      skillsUse: "Use",
+      skillsEmpty: "No skills available yet",
+      skillsGroupPersonal: "Personal",
+      skillsGroupCommon: "Common",
       promptPlaceholder: "Message Claude...",
       promptHint: "Enter to send, Shift+Enter for new line",
       send: "Send",

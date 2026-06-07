@@ -10,6 +10,7 @@ import type { HtmlBlock, Message, MessageAttachment, MessageContentPart } from "
 import { ChatHeader } from "./ChatHeader"
 import { MessageList } from "./MessageList"
 import { PromptInput, type SendOutcome } from "./PromptInput"
+import { WelcomeScreen } from "./WelcomeScreen"
 
 const EMPTY_MESSAGES: never[] = []
 
@@ -402,7 +403,7 @@ export function ChatArea() {
       <ChatHeader />
 
       {!currentSessionId || messages.length === 0 ? (
-        <div className="flex-1" />
+        <WelcomeScreen />
       ) : (
         <MessageList messages={messages} />
       )}
