@@ -17,11 +17,12 @@
     "format:fix": "biome format --write .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
-    "screenshot": "pnpm -F client exec node ../scripts/screenshot.mjs",
+    "screenshot": "node scripts/screenshot.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.59.1",
     "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.0"

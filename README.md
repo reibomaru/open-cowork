@@ -5,11 +5,7 @@
 A self-hosted AI assistant chat, powered by [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent). Chat with Claude in your browser, organise work in named tasks, and bundle reusable workflows as *skills* you can summon with a slash.
 
 <p align="center">
-  <img src="docs/screenshots/landing-light.png" alt="Open Cowork — light theme" width="900" />
-  <br />
-  <em>Welcome screen (light / dark themes)</em>
-  <br />
-  <img src="docs/screenshots/landing-dark.png" alt="Open Cowork — dark theme" width="900" />
+  <img src="docs/screenshots/landing-light.png" alt="Open Cowork welcome screen" width="900" />
 </p>
 
 ## Features

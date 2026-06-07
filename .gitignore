@@ -55,7 +55,6 @@ infra/certs/
 # 旧 CLAUDE_CONFIG_DIR (互換目的で残す)
 /.claude-data/
 
-# 共通 Skills の bind mount（本番では S3 Files が真の保存場所）。
-# plugin manifest と README は管理するが、各 skill 本体は管理対象外。
-/common-skills/skills/*
-!/common-skills/skills/.gitkeep
+# 共通 Skills の bind mount。デフォルト同梱の SKILL.md は管理する。
+# 各 skill 配下のローカル成果物・キャッシュは管理対象外にしたい場合、
+# 個別に追記してください (例: /common-skills/skills/*/cache/)。

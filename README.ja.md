@@ -5,11 +5,7 @@
 [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) を利用したセルフホスト型の AI アシスタントチャット。ブラウザから Claude と対話し、各セッションを「タスク」として整理し、再利用可能なワークフローを「スキル」としてスラッシュ 1 つで呼び出せます。
 
 <p align="center">
-  <img src="docs/screenshots/landing-light.png" alt="Open Cowork — ライトテーマ" width="900" />
-  <br />
-  <em>Welcome screen (ライト / ダークテーマ)</em>
-  <br />
-  <img src="docs/screenshots/landing-dark.png" alt="Open Cowork — ダークテーマ" width="900" />
+  <img src="docs/screenshots/landing-light.png" alt="Open Cowork のホーム画面" width="900" />
 </p>
 
 ## 主な機能

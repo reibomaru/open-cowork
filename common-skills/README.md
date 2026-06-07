@@ -26,7 +26,15 @@ cp -R /path/to/your-skill "$DEST/your-skill"
 
 `docker compose up server` を再起動すると pi-coding-agent が拾う。
 
-## git 管理ポリシー
+## 同梱スキル
 
-- `.claude-plugin/plugin.json` と `skills/.gitkeep` のみコミットする
-- 各 skill 本体 (`skills/<name>/`) は ignore
+リポジトリにはサンプルとして以下の基本スキルを含めている (いずれも `.md` だけの軽量定義):
+
+- `docx` … Word ドキュメント生成・編集
+- `markdown` … Markdown 作成と他形式への変換
+- `pdf` … PDF の読み取り / 生成 / 変換
+- `pptx` … PowerPoint スライド生成
+- `web-research` … Web 情報の取得・要約
+- `xlsx` … Excel ワークブック編集と集計
+
+不要な場合はディレクトリごと削除して、サーバを再起動すれば一覧から消える。

@@ -30,28 +30,11 @@ try {
   })
   const page = await context.newPage()
   await page.goto("http://localhost:5173/", { waitUntil: "networkidle" })
-  // WelcomeScreen の skill catalog が描画されるまで余裕を持って待機
-  await page.waitForTimeout(800)
+  // WelcomeScreen の skill catalog (API fetch 結果) が描画されるまで待機
+  await page.waitForTimeout(1500)
 
-  // Light theme のスクショ
   await page.screenshot({ path: join(outDir, "landing-light.png"), fullPage: false })
   console.log("saved landing-light.png")
-
-  // Dark theme に切り替えてスクショ
-  // theme トグルボタンの aria-label は i18n の `sidebar.toggleToDark` / `toggleToLight`
-  // Light テーマ時は「ダークモードに切替」が表示される
-  const darkBtn = page.getByRole("button", { name: /ダークモード|dark mode/i })
-  if (await darkBtn.count()) {
-    await darkBtn.first().click()
-    // ツールチップが消えるようマウスを画面外に逃がす
-    await page.mouse.move(0, 0)
-    await page.locator("body").click({ position: { x: 720, y: 800 } })
-    await page.waitForTimeout(600)
-    await page.screenshot({ path: join(outDir, "landing-dark.png"), fullPage: false })
-    console.log("saved landing-dark.png")
-  } else {
-    console.log("dark toggle not found, skipping dark screenshot")
-  }
 } finally {
   await browser.close()
 }
