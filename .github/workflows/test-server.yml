@@ -1,0 +1,84 @@
+name: Test (server)
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - ".github/workflows/test-server.yml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "server/**"
+      - ".github/workflows/test-server.yml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: test-server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Hono API E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # DynamoDB Local をサービスコンテナとして同居させる。
+    # ローカル開発の server/docker-compose.test.yml と同じ image。
+    # amazon/dynamodb-local には curl/wget/nc が無いので healthcheck は設定せず、
+    # 後段の step で port 8000 (コンテナ内) の応答を待つ。
+    services:
+      dynamodb-local:
+        image: amazon/dynamodb-local:2.5.3
+        ports:
+          - 8100:8000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for DynamoDB Local
+        # DynamoDB Local は GET / に対し HTTP 400 (BadHttpRequest) を返すので、
+        # 200 でも 400 でも up と判定する。
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8100/ || true)
+            if [ "$code" = "200" ] || [ "$code" = "400" ]; then
+              echo "DynamoDB Local is up (HTTP $code)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "DynamoDB Local did not respond in time"
+          exit 1
+
+      - name: Type-check tests
+        run: pnpm -F server exec tsc --noEmit -p tsconfig.test.json
+
+      - name: Run E2E tests
+        run: pnpm -F server test:e2e
+        env:
+          AWS_ENDPOINT_URL_DYNAMODB: http://localhost:8100

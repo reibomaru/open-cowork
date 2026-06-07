@@ -1,0 +1,58 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "a11y": {
+        "useSemanticElements": "off"
+      }
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "asNeeded"
+    }
+  },
+  "files": {
+    "ignore": [
+      "node_modules",
+      "dist",
+      "dist-ssr",
+      "*.local",
+      "pnpm-lock.yaml",
+      "playwright-report",
+      "test-results",
+      "blob-report",
+      ".claude-data",
+      "workdir"
+    ]
+  },
+  "overrides": [
+    {
+      "include": ["tsconfig*.json"],
+      "json": {
+        "parser": {
+          "allowComments": true,
+          "allowTrailingCommas": true
+        }
+      }
+    },
+    {
+      "include": ["infra/cdk/**/*.ts"],
+      "formatter": {
+        "lineWidth": 80
+      }
+    }
+  ]
+}

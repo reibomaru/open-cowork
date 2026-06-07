@@ -1,0 +1,5 @@
+{
+  "name": "open-cowork-common",
+  "version": "1.0.0-local",
+  "description": "Open Cowork 共通 Skills。docker-compose の bind mount 経由でサーバに公開される。"
+}

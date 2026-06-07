@@ -1,0 +1,34 @@
+{
+  "name": "open-cowork",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10.33.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"pnpm -F client dev\" \"docker compose up server\"",
+    "dev:client": "pnpm -F client dev",
+    "dev:server": "docker compose up server",
+    "build": "pnpm -F client build",
+    "lint": "biome lint .",
+    "format": "biome format .",
+    "format:fix": "biome format --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "concurrently": "^9.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.0"
+  },
+  "lint-staged": {
+    "*": ["biome check --write --no-errors-on-unmatched"]
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@biomejs/biome", "esbuild"]
+  }
+}

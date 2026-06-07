@@ -1,0 +1,61 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+*.local.md
+.env
+
+# Claude Code local settings
+.claude/settings.local.json
+# Claude Agent SDK / Code が作る一時 git worktree。バージョン管理対象外。
+.claude/worktrees/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# CDK
+cdk.out/
+infra/cdk/.env
+
+# Certificates
+infra/certs/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# ローカル開発で Claude SDK の cwd / html artifact 保存先として bind mount
+# される作業ディレクトリ。中身は流動的なので追跡しない。
+/workdir/*
+!/workdir/.gitkeep
+
+# PI_AGENT_DIR としてコンテナにマウントし、pi-coding-agent の sessions/*.jsonl
+# 等の状態をホストに永続化するディレクトリ。中身はユーザーローカル。
+/.pi-data/
+# 旧 CLAUDE_CONFIG_DIR (互換目的で残す)
+/.claude-data/
+
+# 共通 Skills の bind mount（本番では S3 Files が真の保存場所）。
+# plugin manifest と README は管理するが、各 skill 本体は管理対象外。
+/common-skills/skills/*
+!/common-skills/skills/.gitkeep

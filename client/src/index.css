@@ -1,0 +1,295 @@
+@import "tailwindcss";
+
+/* Ubuntu (self-hosted, latin subset only — used for "Open Cowork" title) */
+@font-face {
+  font-family: "Ubuntu";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ubuntu/ubuntu-400-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Ubuntu";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/ubuntu/ubuntu-500-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Ubuntu";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/ubuntu/ubuntu-700-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  /* Monotone palette (旧 ink / ink-mid 名は Tailwind class の後方互換目的で残置) */
+  --color-ink-mid: #2a2a2a;
+  --color-ink-deep: #1a1a1a;
+  --color-ink: #1a1a1a;
+  --color-ink-soft: #333333;
+
+  /* Dark theme surfaces */
+  --color-surface: #0a0a0a;
+  --color-muted: #141414;
+  --color-subtle: #6b6b6b;
+  --color-strong: #c4c4c4;
+
+  /* Light theme surfaces */
+  --color-surface-light: #ffffff;
+  --color-muted-light: #f4f4f4;
+  --color-strong-light: #1a1a1a;
+
+  /* Accent (monotone) */
+  --color-clay: #e5e5e5;
+  --color-clay-deep: #b5b5b5;
+
+  /* Text */
+  --color-text-primary: #f0f0f0;
+  --color-text-primary-light: #0f0f0f;
+  --color-text-secondary: #888888;
+
+  /* Borders */
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-subtle-light: rgba(0, 0, 0, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --color-border-default-light: rgba(0, 0, 0, 0.12);
+
+  /* Diff (monotone — add slightly lighter, remove slightly darker against base) */
+  --color-diff-add: rgba(255, 255, 255, 0.08);
+  --color-diff-remove: rgba(255, 255, 255, 0.16);
+
+  /* Tool colors (grayscale gradient) */
+  --color-tool-read: #9a9a9a;
+  --color-tool-edit: #cfcfcf;
+  --color-tool-bash: #7a7a7a;
+  --color-tool-search: #b5b5b5;
+  --color-tool-agent: #e0e0e0;
+
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
+  --font-family-sans: "Noto Sans", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Helvetica Neue", sans-serif;
+  /* Title font: Ubuntu for latin glyphs (Open Cowork), falls back to sans for JP */
+  --font-family-title: "Ubuntu", "Noto Sans", "Noto Sans JP", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    font-family: var(--font-family-sans);
+  }
+}
+
+/* Dark theme (monotone) */
+.dark {
+  color-scheme: dark;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.dark .bg-app {
+  background-color: var(--color-surface);
+}
+.dark .bg-sidebar {
+  background-color: var(--color-muted);
+}
+.dark .bg-input {
+  background-color: var(--color-muted);
+}
+.dark .text-primary {
+  color: var(--color-text-primary);
+}
+.dark .text-secondary {
+  color: var(--color-text-secondary);
+}
+.dark .border-app {
+  border-color: var(--color-border-default);
+}
+.dark .border-app-subtle {
+  border-color: var(--color-border-subtle);
+}
+.dark .divide-app > * {
+  border-color: var(--color-border-subtle) !important;
+}
+
+/* Light theme (default - monotone) */
+.light {
+  color-scheme: light;
+  background-color: var(--color-surface-light);
+  color: var(--color-text-primary-light);
+}
+
+.light .bg-app {
+  background-color: var(--color-surface-light);
+}
+.light .bg-sidebar {
+  background-color: var(--color-muted-light);
+}
+.light .bg-input {
+  background-color: var(--color-muted-light);
+}
+.light .text-primary {
+  color: var(--color-text-primary-light);
+}
+.light .text-secondary {
+  color: var(--color-text-secondary);
+}
+.light .border-app {
+  border-color: var(--color-border-default-light);
+}
+.light .border-app-subtle {
+  border-color: var(--color-border-subtle-light);
+}
+.light .divide-app > * {
+  border-color: var(--color-border-subtle-light) !important;
+}
+
+/* Light theme: clay は near-black に倒す (dark テーマでは near-white の clay を維持) */
+.light .text-clay {
+  color: var(--color-text-primary-light);
+}
+.light .bg-clay {
+  background-color: var(--color-text-primary-light);
+}
+.light .bg-clay\/20 {
+  background-color: rgba(15, 15, 15, 0.16);
+}
+.light .border-clay {
+  border-color: var(--color-text-primary-light);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-subtle);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-secondary);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-subtle) transparent;
+}
+
+/* Markdown content */
+.markdown-content h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0.5em 0;
+}
+.markdown-content h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.5em 0;
+}
+.markdown-content h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.4em 0;
+}
+.markdown-content p {
+  margin: 0.6em 0;
+  line-height: 1.7;
+}
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.6em 0;
+  padding-left: 1.5em;
+}
+.markdown-content li {
+  margin: 0.2em 0;
+}
+.markdown-content code {
+  font-family: var(--font-family-mono);
+  font-size: 0.875em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background-color: var(--color-muted);
+}
+.light .markdown-content code {
+  background-color: var(--color-muted-light);
+}
+.markdown-content pre {
+  margin: 0.5em 0;
+  padding: 0.75em 1em;
+  border-radius: 6px;
+  background-color: var(--color-muted) !important;
+  overflow-x: auto;
+}
+.light .markdown-content pre {
+  background-color: var(--color-muted-light) !important;
+}
+.markdown-content pre code {
+  padding: 0;
+  background: none;
+}
+.markdown-content a {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+}
+.light .markdown-content a {
+  color: var(--color-text-primary-light);
+}
+.markdown-content blockquote {
+  border-left: 3px solid var(--color-subtle);
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: var(--color-text-secondary);
+}
+.light .markdown-content blockquote {
+  border-left-color: var(--color-text-primary-light);
+}
+
+/* Blinking cursor for streaming */
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.streaming-cursor::after {
+  content: "\25AE";
+  animation: blink 1s step-end infinite;
+  color: var(--color-text-primary);
+  margin-left: 2px;
+}
+.light .streaming-cursor::after {
+  color: var(--color-text-primary-light);
+}

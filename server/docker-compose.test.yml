@@ -1,0 +1,8 @@
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.5.3
+    container_name: open-cowork-server-dynamodb-local
+    ports:
+      - "8100:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    working_dir: /home/dynamodblocal

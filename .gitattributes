@@ -1,0 +1,4 @@
+# Linux コンテナで実行するシェルスクリプトは LF 固定。
+# core.autocrlf=true な Windows 環境でも CRLF に変換されないようにする
+# （CRLF だとコンテナで `exec: /usr/local/bin/docker-entrypoint.sh: no such file or directory` になる）。
+*.sh text eol=lf
