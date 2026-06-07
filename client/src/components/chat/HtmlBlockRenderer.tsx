@@ -72,7 +72,9 @@ export function HtmlBlockRenderer({ block }: HtmlBlockRendererProps) {
       <Code size={14} className="text-neutral-400 shrink-0" />
       <span className="text-primary font-medium">HTML</span>
       {block.title && <span className="text-secondary text-xs truncate">{block.title}</span>}
-      {block.status === "streaming" && <Loader2 size={14} className="text-neutral-400 animate-spin" />}
+      {block.status === "streaming" && (
+        <Loader2 size={14} className="text-neutral-400 animate-spin" />
+      )}
       {block.status === "complete" && (
         <div className="flex items-center gap-1 ml-auto shrink-0">
           <Tooltip label={t("htmlBlock.download")}>

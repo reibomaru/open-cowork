@@ -248,7 +248,6 @@ export const api = {
     })
     if (!res.ok && res.status !== 404) throw await SkillApiError.fromResponse(res)
   },
-
 }
 
 function customFetchHeaders(): HeadersInit {

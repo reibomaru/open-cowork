@@ -20,11 +20,7 @@ const SKILLS_DIR = resolve(
 // pi-coding-agent は <cwd>/.pi/prompts/<name>.md を `/name` で展開する。
 const COMMANDS_DIR = resolve(
   process.env.COMMANDS_DIR ??
-    join(
-      process.env.WORKDIR_USER ?? process.env.CLAUDE_CWD ?? process.cwd(),
-      ".pi",
-      "prompts",
-    ),
+    join(process.env.WORKDIR_USER ?? process.env.CLAUDE_CWD ?? process.cwd(), ".pi", "prompts"),
 )
 
 // 共通 skill (RO で配布) のパス。docs/skills-architecture.md 参照。

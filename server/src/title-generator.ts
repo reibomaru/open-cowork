@@ -1,4 +1,4 @@
-import { complete, getModel, type KnownProvider } from "@earendil-works/pi-ai"
+import { type KnownProvider, complete, getModel } from "@earendil-works/pi-ai"
 import { createLogger, serializeError } from "./logger"
 
 const log = createLogger("title-generator")

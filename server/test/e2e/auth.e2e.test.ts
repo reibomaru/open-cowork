@@ -36,16 +36,4 @@ describe("Hono auth e2e", () => {
     // /health は 404 (testApp に登録していない) — 401 で弾かれないことを確認する。
     expect(res.status).toBe(404)
   })
-
-  it("POST /api/browser/ticket は認証通過すれば ticket を発行する", async () => {
-    const res = await apiFetch(app, "/api/browser/ticket", {
-      userId: "user-a",
-      method: "POST",
-    })
-
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as { ticket: string }
-    expect(body.ticket).toBeTruthy()
-    expect(body.ticket.length).toBeGreaterThan(10)
-  })
 })

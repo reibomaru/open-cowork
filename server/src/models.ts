@@ -34,8 +34,7 @@ export const MODELS = [
     label: "Sonnet",
     description: "性能とコストのバランス型。日常的なタスクの標準モデル。",
     provider: process.env.CLAUDE_MODEL_SONNET_PROVIDER ?? DEFAULT_PROVIDER,
-    model:
-      process.env.CLAUDE_MODEL_SONNET ?? process.env.CLAUDE_MODEL ?? "claude-sonnet-4-5",
+    model: process.env.CLAUDE_MODEL_SONNET ?? process.env.CLAUDE_MODEL ?? "claude-sonnet-4-5",
   },
   {
     id: "claude-haiku-4-5",

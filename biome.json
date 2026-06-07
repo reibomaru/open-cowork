@@ -35,6 +35,7 @@
       "test-results",
       "blob-report",
       ".claude-data",
+      ".pi-data",
       "workdir"
     ]
   },
@@ -46,12 +47,6 @@
           "allowComments": true,
           "allowTrailingCommas": true
         }
-      }
-    },
-    {
-      "include": ["infra/cdk/**/*.ts"],
-      "formatter": {
-        "lineWidth": 80
       }
     }
   ]

@@ -13,10 +13,10 @@
  * 経由で実行する (Node の module resolution が client 配下から動く必要がある)。
  */
 
-import { chromium } from "@playwright/test"
 import { mkdir } from "node:fs/promises"
-import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { chromium } from "@playwright/test"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = join(here, "..", "docs", "screenshots")

@@ -1,14 +1,14 @@
+import { type KnownProvider, type Model, getModel } from "@earendil-works/pi-ai"
 import {
   type AgentSession,
   AuthStorage,
-  createAgentSession,
   DefaultResourceLoader,
-  getAgentDir,
   ModelRegistry,
   SessionManager,
   type ToolDefinition,
+  createAgentSession,
+  getAgentDir,
 } from "@earendil-works/pi-coding-agent"
-import { getModel, type KnownProvider, type Model } from "@earendil-works/pi-ai"
 import { createLogger, serializeError } from "./logger"
 
 const log = createLogger("agent-query")
@@ -147,25 +147,26 @@ export async function runAgentQuery(
       const provider = opts.model.slice(0, slash)
       const id = opts.model.slice(slash + 1)
       resolvedModel =
-        (modelRegistry.find(provider, id) as Model<never> | undefined) ??
-        safeGetModel(provider, id)
+        (modelRegistry.find(provider, id) as Model<never> | undefined) ?? safeGetModel(provider, id)
     }
   }
+
+  // narrow optional fields once so the closure passed to systemPromptOverride
+  // never relies on non-null assertions.
+  const explicitSystemPrompt = opts.systemPrompt
+  const appendedSystemPrompt = opts.appendSystemPrompt
+  const systemPromptOverride: ((base: string | undefined) => string) | undefined =
+    explicitSystemPrompt
+      ? () => explicitSystemPrompt
+      : appendedSystemPrompt
+        ? (current) => (current ? `${current}\n\n${appendedSystemPrompt}` : appendedSystemPrompt)
+        : undefined
 
   const loader = new DefaultResourceLoader({
     cwd: opts.cwd ?? process.cwd(),
     agentDir: opts.agentDir ?? getAgentDir(),
     ...(opts.skillPaths ? { additionalSkillPaths: opts.skillPaths } : {}),
-    ...(opts.systemPrompt
-      ? { systemPromptOverride: () => opts.systemPrompt! }
-      : opts.appendSystemPrompt
-        ? {
-            systemPromptOverride: (current: string | undefined) =>
-              current
-                ? `${current}\n\n${opts.appendSystemPrompt}`
-                : opts.appendSystemPrompt!,
-          }
-        : {}),
+    ...(systemPromptOverride ? { systemPromptOverride } : {}),
   })
   await loader.reload()
 
