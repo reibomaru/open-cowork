@@ -11,32 +11,18 @@ import { formatMcpToolName, streamClaudeAgentResponse, summarizeToolInput } from
 import * as dao from "./dynamodb-sessions"
 import { MAX_FILE_SIZE, UploadError, type UploadedFile, fileStore } from "./file-store"
 import { createLogger } from "./logger"
-import { generateScenario } from "./mock-agent"
-import { seedSessions } from "./mock-data/sessions"
 import { DEFAULT_MODEL_ID, MODELS, MODEL_IDS } from "./models"
 import { SkillError, skillStore } from "./skill-store"
-import { streamEvents } from "./sse"
 import type { Session, StoredMessage } from "./types"
 import { SERVER_VERSION } from "./version"
 
 const log = createLogger("routes")
-
-export const USE_MOCK = process.env.USE_MOCK !== "false"
 
 // pi-coding-agent の cwd と同じディレクトリ。docker-compose が ./workdir を bind mount し、
 // WORKDIR_USER=/home/node/workdir で export する。ローカル開発で env 未設定でも動くよう
 // CLAUDE_CWD も後方互換で拾う。
 const WORKDIR_USER = process.env.WORKDIR_USER ?? process.env.CLAUDE_CWD
 
-// ---------------------------------------------------------------------------
-// Mock 用 in-memory ストレージ
-//   USE_MOCK=true で使う dev 用パス。USE_MOCK=false の場合は DynamoDB に永続化する。
-// ---------------------------------------------------------------------------
-
-let mockSessions: Session[] = [...seedSessions]
-const mockMessagesBySession: Record<string, StoredMessage[]> = {}
-
-type PendingMock = { kind: "mock"; events: ReturnType<typeof generateScenario> }
 type PendingAgent = {
   kind: "agent"
   prompt: string
@@ -54,19 +40,10 @@ type PendingAgent = {
   /** Haiku 呼び出しの送信元ユーザー。dao.patchSession に必要。 */
   userId: string
 }
-const pendingStreams: Record<string, PendingMock | PendingAgent> = {}
+const pendingStreams: Record<string, PendingAgent> = {}
 
 type Variables = { userId: string }
 const app = new Hono<{ Variables: Variables }>()
-
-/**
- * Mock 用所有権チェック。USE_MOCK=true でのみ使用。
- */
-function findOwnedMockSession(sessionId: string, userId: string): Session | null {
-  const session = mockSessions.find((s) => s.id === sessionId)
-  if (!session || session.ownerId !== userId) return null
-  return session
-}
 
 /**
  * 実 DAO を使って所有権検証付きで取得する。存在しない / 不一致は null。
@@ -448,20 +425,12 @@ const routes = app
   // --- Sessions ---
   .get("/api/sessions", async (c) => {
     const userId = c.get("userId")
-    if (USE_MOCK) {
-      return c.json(mockSessions.filter((s) => s.ownerId === userId && s.status !== "archived"))
-    }
     const sessions = await dao.listByUserId(userId)
     return c.json(sessions)
   })
   .get("/api/sessions/:id", async (c) => {
     const userId = c.get("userId")
     const id = c.req.param("id")
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(id, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-      return c.json(session)
-    }
     // getSession は ConsistentRead 済みなので、ターン直後の usage 累計も最新が返る。
     // セッション一覧 (listByUserId) は LSI 経由で usage* を projection しないため、
     // 累計使用量の権威ある読み出しはこの単体取得を使う。
@@ -495,11 +464,7 @@ const routes = app
         model: body?.model ?? DEFAULT_MODEL_ID,
         permissionMode: "ask",
       }
-      if (USE_MOCK) {
-        mockSessions.unshift(session)
-      } else {
-        await dao.putSession(session)
-      }
+      await dao.putSession(session)
       return c.json(session)
     },
   )
@@ -519,16 +484,6 @@ const routes = app
       const id = c.req.param("id")
       const body = c.req.valid("json")
 
-      if (USE_MOCK) {
-        const session = findOwnedMockSession(id, userId)
-        if (!session) return c.json({ error: "Not found" }, 404)
-        Object.assign(session, body, { updatedAt: Date.now() })
-        if (body.title !== undefined) {
-          session.titleGenerated = true
-        }
-        return c.json(session)
-      }
-
       // ユーザーが手動で title を編集したら titleGenerated を立てて、
       // 以後の自動要約 (1 通目 Haiku) で上書きされないようにする。
       const patch: dao.SessionPatch = { ...body }
@@ -545,17 +500,6 @@ const routes = app
     const userId = c.get("userId")
     const id = c.req.param("id")
 
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(id, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-      mockSessions = mockSessions.filter((s) => s.id !== id)
-      delete mockMessagesBySession[id]
-      delete pendingStreams[id]
-      // 添付ファイルはユーザー単位のフラット保存になったので、セッション削除では消さない
-      // (他セッションから同じ fileId を参照している可能性があるため)
-      return c.body(null, 204)
-    }
-
     const session = await getOwnedSession(id, userId)
     if (!session) return c.json({ error: "Not found" }, 404)
     await dao.deleteSession(userId, id)
@@ -567,12 +511,6 @@ const routes = app
   .get("/api/sessions/:id/messages", async (c) => {
     const userId = c.get("userId")
     const id = c.req.param("id")
-
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(id, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-      return c.json(mockMessagesBySession[session.id] || [])
-    }
 
     const session = await getOwnedSession(id, userId)
     if (!session) return c.json({ error: "Not found" }, 404)
@@ -656,49 +594,6 @@ const routes = app
         }
       }
 
-      if (USE_MOCK) {
-        const session = findOwnedMockSession(sessionId, userId)
-        if (!session) return c.json({ error: "Not found" }, 404)
-
-        if (!mockMessagesBySession[sessionId]) {
-          mockMessagesBySession[sessionId] = []
-        }
-
-        const userMsg: StoredMessage = {
-          id: uuid(),
-          sessionId,
-          role: "user",
-          content,
-          timestamp: Date.now(),
-        }
-        mockMessagesBySession[sessionId].push(userMsg)
-
-        if (session.title === "New Session") {
-          session.title = content.slice(0, 50) + (content.length > 50 ? "..." : "")
-          session.updatedAt = Date.now()
-        }
-
-        pendingStreams[sessionId] = {
-          kind: "mock",
-          events: generateScenario(promptForAgent),
-        }
-
-        const assistantMsg: StoredMessage = {
-          id: uuid(),
-          sessionId,
-          role: "assistant",
-          content: "[streaming]",
-          timestamp: Date.now(),
-        }
-        mockMessagesBySession[sessionId].push(assistantMsg)
-
-        return c.json({
-          userMessage: userMsg,
-          assistantMessageId: assistantMsg.id,
-        })
-      }
-
-      // --- 実 pi-coding-agent ブランチ (USE_MOCK=false) ---
       const session = await getOwnedSession(sessionId, userId)
       if (!session) return c.json({ error: "Not found" }, 404)
 
@@ -755,13 +650,8 @@ const routes = app
     const userId = c.get("userId")
     const sessionId = c.req.param("id")
 
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    } else {
-      const session = await getOwnedSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    }
+    const session = await getOwnedSession(sessionId, userId)
+    if (!session) return c.json({ error: "Not found" }, 404)
 
     const pending = pendingStreams[sessionId]
 
@@ -774,24 +664,19 @@ const routes = app
     delete pendingStreams[sessionId]
 
     return streamSSE(c, async (stream) => {
-      let titleUpdated = false
-      if (pending.kind === "mock") {
-        await streamEvents(stream, pending.events)
-      } else {
-        await streamClaudeAgentResponse(stream, {
-          prompt: pending.prompt,
-          userId,
-          sessionId: pending.sessionId,
-          modelId: pending.model,
-          titleGenerationInput: pending.generateTitle
-            ? { userMessage: pending.userMessageText }
-            : undefined,
-        })
-        // pending.generateTitle === true のターンだけ Haiku 要約が走り、サーバ側で
-        // セッションタイトル/titleGenerated フラグが書き換わっている可能性がある。
-        // それ以外のターンでサイドバー一覧 refetch を抑止するためのヒントを done に同梱する。
-        titleUpdated = pending.generateTitle === true
-      }
+      await streamClaudeAgentResponse(stream, {
+        prompt: pending.prompt,
+        userId,
+        sessionId: pending.sessionId,
+        modelId: pending.model,
+        titleGenerationInput: pending.generateTitle
+          ? { userMessage: pending.userMessageText }
+          : undefined,
+      })
+      // pending.generateTitle === true のターンだけ Haiku 要約が走り、サーバ側で
+      // セッションタイトル/titleGenerated フラグが書き換わっている可能性がある。
+      // それ以外のターンでサイドバー一覧 refetch を抑止するためのヒントを done に同梱する。
+      const titleUpdated = pending.generateTitle === true
       await stream.writeSSE({ event: "done", data: JSON.stringify({ titleUpdated }) })
     })
   })
@@ -804,13 +689,8 @@ const routes = app
     const userId = c.get("userId")
     const sessionId = c.req.param("id")
 
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    } else {
-      const session = await getOwnedSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    }
+    const session = await getOwnedSession(sessionId, userId)
+    if (!session) return c.json({ error: "Not found" }, 404)
 
     const contentLength = Number(c.req.header("content-length") ?? "0")
     // 余裕を持って 2 倍程度を上限に。multipart の境界文字列でわずかに膨れるため。
@@ -909,13 +789,8 @@ const routes = app
     const userId = c.get("userId")
     const sessionId = c.req.param("id")
 
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    } else {
-      const session = await getOwnedSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    }
+    const session = await getOwnedSession(sessionId, userId)
+    if (!session) return c.json({ error: "Not found" }, 404)
 
     // ユーザー単位フラット保存に変更したので、sessionId に関わらず同じ一覧を返す。
     // 所有権チェックは session 経由でユーザー特定する代理として残してある。
@@ -935,13 +810,8 @@ const routes = app
     const sessionId = c.req.param("id")
     const fileId = c.req.param("fileId")
 
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    } else {
-      const session = await getOwnedSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    }
+    const session = await getOwnedSession(sessionId, userId)
+    if (!session) return c.json({ error: "Not found" }, 404)
 
     const ok = await fileStore.delete(fileId)
     if (!ok) return c.json({ error: "Not found" }, 404)
@@ -956,13 +826,8 @@ const routes = app
     const sessionId = c.req.param("id")
     const fileId = c.req.param("fileId")
 
-    if (USE_MOCK) {
-      const session = findOwnedMockSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    } else {
-      const session = await getOwnedSession(sessionId, userId)
-      if (!session) return c.json({ error: "Not found" }, 404)
-    }
+    const session = await getOwnedSession(sessionId, userId)
+    if (!session) return c.json({ error: "Not found" }, 404)
 
     const files = await fileStore.list()
     const target = files.find((f) => f.id === fileId)

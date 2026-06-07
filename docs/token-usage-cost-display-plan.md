@@ -94,9 +94,7 @@ onUsage(delta) {
 }
 ```
 
-`onUsage` は `result` メッセージ時 (=ターン終盤) に発火し、`routes.ts:802` の最終 `done` イベントより前に流れるので順序問題なし。DynamoDB が真の情報源、ライブ SSE は即時フィードバック用。
-
-mock ブランチ (`USE_MOCK`) では `streamClaudeAgentResponse` は呼ばれない (`routes.ts:785` で `streamEvents`) ため usage は流れない。ローカル UI 確認用に、mock シナリオへダミーの `usage` イベントを 1 つ注入する。
+`onUsage` は `result` メッセージ時 (=ターン終盤) に発火し、最終 `done` イベントより前に流れるので順序問題なし。DynamoDB が真の情報源、ライブ SSE は即時フィードバック用。
 
 ### 5. セッション単体取得エンドポイント — `server/src/routes.ts`
 

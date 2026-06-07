@@ -26,7 +26,7 @@ A self-hosted AI assistant chat, powered by [`@earendil-works/pi-coding-agent`](
 
 - [Node.js 22+](https://nodejs.org/) and [pnpm 10+](https://pnpm.io/installation)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (used to run a local DynamoDB for chat history)
-- An [Anthropic API key](https://console.anthropic.com/) for live agent responses (optional — see *Mock mode* below)
+- An [Anthropic API key](https://console.anthropic.com/) for live agent responses
 
 ### 1. Install
 
@@ -57,10 +57,6 @@ pnpm dev
 
 This starts the backend (in Docker) and the Vite dev server. Open <http://localhost:5173> and start chatting.
 
-### Mock mode (no API key needed)
-
-To try the UI without an API key, set `USE_MOCK=true` in `server/.env`. The app responds with canned messages so you can explore tasks, attachments, and skills without billing.
-
 ## Using Skills
 
 A *skill* is a Markdown file the agent loads as a reusable system prompt. Drop a `SKILL.md` into `common-skills/skills/<name>/` and the agent picks it up on the next message. In chat, summon it by typing:
@@ -79,7 +75,6 @@ The most common settings live in `server/.env`:
 |----------|---------|
 | `ANTHROPIC_API_KEY` | Your Anthropic API key. |
 | `MODEL_PROVIDER` | Provider used by default (`anthropic`, `amazon-bedrock`, etc.). |
-| `USE_MOCK` | `true` to use the in-memory mock agent; `false` for the real LLM. |
 | `DEV_USER_ID` | Local userId fallback when no auth header is present. |
 
 See `server/.env.example` for the full list and inline notes.

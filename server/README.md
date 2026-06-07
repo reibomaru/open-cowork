@@ -39,6 +39,6 @@ pnpm -F server test:e2e:down  # 後片付け
 
 ### 設計メモ
 
-- `USE_MOCK=false` を明示してテストする（本番ブランチ = DynamoDB 経由）。`USE_MOCK=true` の in-memory パスは別途必要なら追加する
-- `getSessionMessages` の SDK transcript 読み込みは、対応する jsonl が無い場合に例外を catch して `[]` を返す。テストでは transcript を用意しないので結果は `[]`
-- SSE ストリーミング (`/api/sessions/:id/stream`) は Bedrock 呼び出しを伴うため E2E では対象外。Hono レベルでのルート確認は別途モック層を作るか検討
+- DynamoDB Local 経由でテストする (Hono の DAO 経路を直接叩く)
+- `SessionManager.open` の transcript 読み込みは、対応する jsonl が無い場合に例外を catch して `[]` を返す。テストでは transcript を用意しないので結果は `[]`
+- SSE ストリーミング (`/api/sessions/:id/stream`) は LLM 呼び出しを伴うため E2E では対象外

@@ -3,7 +3,7 @@ import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { authMiddleware } from "./auth"
 import { createLogger } from "./logger"
-import routes, { USE_MOCK } from "./routes"
+import routes from "./routes"
 
 // docker-compose や entrypoint で WORKDIR_USER を渡したときは Node 起動後にそちらへ
 // chdir する。artifact-store / claude-agent の writableRoot 解決を揃えつつ、起動
@@ -62,8 +62,7 @@ app.route("/", routes)
 const PORT = Number(process.env.PORT) || 3000
 
 const server = serve({ fetch: app.fetch, port: PORT }, () => {
-  const mode = USE_MOCK ? "MOCK" : "PI-CODING-AGENT"
-  log.info("Server started", { port: PORT, mode })
+  log.info("Server started", { port: PORT })
 })
 
 function shutdown() {

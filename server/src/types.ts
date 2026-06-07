@@ -87,9 +87,3 @@ export interface StoredMessage {
   /** この message から参照された skill の chip 情報。skill_invoked SSE と同じ形を取る。 */
   skillReferences?: SkillReferenceInfo[]
 }
-
-export interface SSEEvent {
-  event: string
-  data: unknown
-  delay: number // ms delay before sending this event
-}

@@ -90,10 +90,8 @@ pnpm dev
 
 | ファイル | 主要な設定 |
 |---------|----------|
-| `server/.env` | `USE_MOCK` (mock/実SDK切替), `DEV_USER_ID` (認証フォールバック), `DYNAMODB_TABLE_SESSIONS`, `ANTHROPIC_API_KEY`, `MODEL_PROVIDER`, `PI_AGENT_DIR` |
+| `server/.env` | `DEV_USER_ID` (認証フォールバック), `DYNAMODB_TABLE_SESSIONS`, `ANTHROPIC_API_KEY`, `MODEL_PROVIDER`, `PI_AGENT_DIR` |
 | `client/.env` | `VITE_DEV_USER_ID` (認証フォールバック) |
-
-`server/.env` で `USE_MOCK=true` にするとモックエージェントが使われ、API キーなしで動作する。UI 反復に便利。
 
 ## DynamoDB (ローカル)
 

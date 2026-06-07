@@ -26,7 +26,7 @@
 
 - [Node.js 22+](https://nodejs.org/) と [pnpm 10+](https://pnpm.io/installation)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (チャット履歴用のローカル DynamoDB を起動するため)
-- [Anthropic API キー](https://console.anthropic.com/) (実エージェント応答が必要な場合。後述の *モックモード* で API キー無し動作も可能)
+- [Anthropic API キー](https://console.anthropic.com/) (エージェント応答に必要)
 
 ### 1. インストール
 
@@ -57,10 +57,6 @@ pnpm dev
 
 バックエンド (Docker) と Vite 開発サーバが立ち上がります。<http://localhost:5173> を開いてチャット開始。
 
-### モックモード (API キー不要)
-
-API キー無しで UI を試したい場合は `server/.env` の `USE_MOCK=true` に変更してください。エージェント応答は定型文に置き換わり、課金無しでタスク / 添付 / スキルの動作を確認できます。
-
 ## スキルの使い方
 
 スキルは「再利用可能なシステムプロンプト」として読み込まれる Markdown ファイルです。`common-skills/skills/<name>/SKILL.md` に置けば次の送信から自動で認識されます。チャットでの呼び出し方:
@@ -79,7 +75,6 @@ API キー無しで UI を試したい場合は `server/.env` の `USE_MOCK=true
 |------|------|
 | `ANTHROPIC_API_KEY` | Anthropic API キー |
 | `MODEL_PROVIDER` | 既定プロバイダ (`anthropic` / `amazon-bedrock` 等) |
-| `USE_MOCK` | `true` でモックエージェント、`false` で実 LLM |
 | `DEV_USER_ID` | 認証ヘッダ未指定時のフォールバック userId |
 
 全項目とコメントは `server/.env.example` を参照。

@@ -5,7 +5,6 @@ import { defineConfig } from "vitest/config"
 // DynamoDB は docker-compose.test.yml で起動した DynamoDB Local (port 8100) を使う。
 // auth は dev fallback (DEV_USER_ID + X-User-Id ヘッダ) でユーザー切替する。
 //
-// USE_MOCK は明示的に "false" にして dynamodb-sessions の本番ブランチを叩く。
 // env はテストプロセス共通。Hono ルートはモジュールロード時に SDK Client を
 // new するため、子プロセス起動前に確実に値を渡す必要がある。
 export default defineConfig({
@@ -27,8 +26,6 @@ export default defineConfig({
       AWS_SECRET_ACCESS_KEY: "test",
       AWS_ENDPOINT_URL_DYNAMODB: "http://localhost:8100",
       DYNAMODB_TABLE_SESSIONS: "open-cowork-sessions-test",
-      // --- Hono ルートの分岐制御 ---
-      USE_MOCK: "false",
       DEFAULT_MODEL: "claude-sonnet-4-6-test",
       // --- auth dev fallback ---
       DEV_USER_ID: "test-user-default",

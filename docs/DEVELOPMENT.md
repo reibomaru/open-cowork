@@ -90,10 +90,8 @@ Server-side tests (run inside the `server/` workspace):
 
 | File | Key settings |
 |------|--------------|
-| `server/.env` | `USE_MOCK` (mock vs real agent), `DEV_USER_ID` (auth fallback), `DYNAMODB_TABLE_SESSIONS`, `ANTHROPIC_API_KEY`, `MODEL_PROVIDER`, `PI_AGENT_DIR` |
+| `server/.env` | `DEV_USER_ID` (auth fallback), `DYNAMODB_TABLE_SESSIONS`, `ANTHROPIC_API_KEY`, `MODEL_PROVIDER`, `PI_AGENT_DIR` |
 | `client/.env` | `VITE_DEV_USER_ID` (auth fallback) |
-
-Set `USE_MOCK=true` in `server/.env` to use the in-memory mock agent — handy when iterating on UI without consuming API credits.
 
 ## DynamoDB (Local)
 
