@@ -7,7 +7,7 @@ export const messages = {
     },
     sidebar: {
       title: "Open Cowork",
-      previewBadge: "Preview版",
+      previewBadge: "Beta版",
       toggleToLight: "ライトモードに切替",
       toggleToDark: "ダークモードに切替",
       newSession: "新規タスク",
@@ -241,7 +241,7 @@ export const messages = {
     },
     sidebar: {
       title: "Open Cowork",
-      previewBadge: "Preview",
+      previewBadge: "Beta",
       toggleToLight: "Switch to light mode",
       toggleToDark: "Switch to dark mode",
       newSession: "New Task",
