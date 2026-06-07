@@ -2,7 +2,7 @@
 
 [日本語版 / Japanese version](./README.ja.md)
 
-An AI assistant web application powered by [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent).
+A self-hosted AI assistant chat, powered by [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent). Chat with Claude in your browser, organise work in named tasks, and bundle reusable workflows as *skills* you can summon with a slash.
 
 <p align="center">
   <img src="docs/screenshots/landing-light.png" alt="Open Cowork — light theme" width="900" />
@@ -12,100 +12,80 @@ An AI assistant web application powered by [`@earendil-works/pi-coding-agent`](h
   <img src="docs/screenshots/landing-dark.png" alt="Open Cowork — dark theme" width="900" />
 </p>
 
-## Tech Stack
+## Features
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 19 / TypeScript / Vite / Tailwind CSS / Zustand |
-| Backend | Hono / TypeScript / **@earendil-works/pi-coding-agent** |
-| Data | DynamoDB (local: `dynamodb-local` container) |
-| Auth | Dev-only fixed `DEV_USER_ID` fallback |
+- 🧵 **Tasks** — Each conversation is a persistent task you can rename, archive, and resume.
+- 🛠️ **Skills** — Drop a `SKILL.md` file in your project, then call it from the chat with `/skill-name`.
+- 📎 **Attachments** — Drag in PDFs, images, and Office documents; the agent reads them inline.
+- 🎨 **HTML artifacts** — Code blocks tagged `html` render live in a side-by-side preview.
+- 🌗 **Light / dark themes** with a monochrome design that stays out of the way.
 
-## Project Layout
-
-```
-client/                … React SPA
-server/                … Hono API server + pi-coding-agent SDK
-common-skills/         … Shared skills mounted (RO bind) into the agent
-workdir/               … Agent cwd and HTML artifact output
-docs/                  … Feature specs and design notes
-```
-
-The core agent execution code lives in `server/src/agent-query.ts` and `server/src/claude-agent.ts`.
-The filenames are kept for historical continuity; the implementation is built on pi-coding-agent.
-
-> This repository does not ship production-grade IaC, CI/CD, or an auth backend.
-> If you need real authentication or cloud database persistence,
-> replace `server/src/auth.ts` and `server/src/dynamodb-sessions.ts`.
-
-## Local Development
+## Quick Start
 
 ### Prerequisites
 
-- Node.js 22+
-- pnpm 10+
-- Docker Desktop
+- [Node.js 22+](https://nodejs.org/) and [pnpm 10+](https://pnpm.io/installation)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (used to run a local DynamoDB for chat history)
+- An [Anthropic API key](https://console.anthropic.com/) for live agent responses (optional — see *Mock mode* below)
 
-### Setup
+### 1. Install
 
 ```bash
+git clone https://github.com/reibomaru/open-cowork.git
+cd open-cowork
 pnpm install
-[ -f server/.env ] || cp server/.env.example server/.env
-[ -f client/.env ] || cat > client/.env << 'EOF'
-VITE_API_BASE_URL=http://localhost:5173
-VITE_DEV_USER_ID=dev-user-1
-EOF
-docker compose build server
 ```
 
-To hit the Anthropic API directly through pi-coding-agent, export an API key:
+### 2. Configure
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+cp server/.env.example server/.env
+cp client/.env.example client/.env
 ```
 
-### Run
+Then open `server/.env` and add your API key:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 3. Run
 
 ```bash
 pnpm dev
 ```
 
-- Frontend: <http://localhost:5173> (Vite, native HMR)
-- Backend: <http://localhost:3000> (Docker container, auto-restart via `--watch`)
+This starts the backend (in Docker) and the Vite dev server. Open <http://localhost:5173> and start chatting.
 
-### npm Scripts
+### Mock mode (no API key needed)
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Run frontend + backend together |
-| `pnpm dev:client` | Frontend only |
-| `pnpm dev:server` | Backend container only |
-| `pnpm build` | Build the SPA into `client/dist/` |
-| `pnpm check:fix` | Lint + format with Biome |
+To try the UI without an API key, set `USE_MOCK=true` in `server/.env`. The app responds with canned messages so you can explore tasks, attachments, and skills without billing.
 
-### Environment Variables
+## Using Skills
 
-| File | Key settings |
-|------|--------------|
-| `server/.env` | `USE_MOCK` (toggle mock / real agent), `DEV_USER_ID` (auth fallback), `DYNAMODB_TABLE_SESSIONS`, `ANTHROPIC_API_KEY`, `MODEL_PROVIDER`, `PI_AGENT_DIR` |
-| `client/.env` | `VITE_DEV_USER_ID` (auth fallback) |
+A *skill* is a Markdown file the agent loads as a reusable system prompt. Drop a `SKILL.md` into `common-skills/skills/<name>/` and the agent picks it up on the next message. In chat, summon it by typing:
 
-Set `USE_MOCK=true` in `server/.env` to use the in-memory mock agent — handy for UI development without an API key.
+```
+/<skill-name> your additional prompt here
+```
 
-### DynamoDB (Local)
+You'll see the matching skill in the welcome screen's skill catalog as well.
 
-`pnpm dev` and `docker compose up server` both bring up a `dynamodb-local`
-container together with a `dynamodb-init` helper that creates a `SessionsTableV2`-
-equivalent schema (`PK=userId`, `SK=sessionId`, LSI `SessionsByUpdatedAt`,
-TTL on `ttl`).
+## Configuration
 
-- Data is persisted in the `dynamodb-local-data` volume.
-  Survives `docker compose down`; wiped by `docker compose down -v`.
-- The host port for DynamoDB is intentionally **not** bound (it would clash when
-  running multiple worktrees in parallel). To poke around from the host:
+The most common settings live in `server/.env`:
 
-  ```bash
-  docker compose run --rm \
-    -e AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000 \
-    dynamodb-init aws dynamodb scan --table-name sessions-local
-  ```
+| Variable | Purpose |
+|----------|---------|
+| `ANTHROPIC_API_KEY` | Your Anthropic API key. |
+| `MODEL_PROVIDER` | Provider used by default (`anthropic`, `amazon-bedrock`, etc.). |
+| `USE_MOCK` | `true` to use the in-memory mock agent; `false` for the real LLM. |
+| `DEV_USER_ID` | Local userId fallback when no auth header is present. |
+
+See `server/.env.example` for the full list and inline notes.
+
+## Documentation
+
+- [日本語 README](./README.ja.md)
+- [Developer guide](./docs/DEVELOPMENT.md) — architecture, project layout, scripts, etc.
+- [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) — the underlying agent runtime.

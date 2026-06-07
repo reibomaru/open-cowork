@@ -2,7 +2,7 @@
 
 [English / 英語版](./README.md)
 
-[`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) を利用した AI アシスタント Web アプリケーション。
+[`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) を利用したセルフホスト型の AI アシスタントチャット。ブラウザから Claude と対話し、各セッションを「タスク」として整理し、再利用可能なワークフローを「スキル」としてスラッシュ 1 つで呼び出せます。
 
 <p align="center">
   <img src="docs/screenshots/landing-light.png" alt="Open Cowork — ライトテーマ" width="900" />
@@ -12,98 +12,80 @@
   <img src="docs/screenshots/landing-dark.png" alt="Open Cowork — ダークテーマ" width="900" />
 </p>
 
-## 技術スタック
+## 主な機能
 
-| レイヤー | 技術 |
-|---------|------|
-| Frontend | React 19 / TypeScript / Vite / Tailwind CSS / Zustand |
-| Backend | Hono / TypeScript / **@earendil-works/pi-coding-agent** |
-| データ | DynamoDB (ローカルは `dynamodb-local` コンテナ) |
-| 認証 | 開発時は `DEV_USER_ID` の固定 userId フォールバック |
+- 🧵 **タスク管理** — 1 会話 = 1 タスク。リネーム / アーカイブ / 再開できる。
+- 🛠️ **スキル** — `SKILL.md` をプロジェクトに置けば `/skill-name` で呼び出せる。
+- 📎 **添付ファイル** — PDF / 画像 / Office ドキュメントをドラッグで渡せる。
+- 🎨 **HTML アーティファクト** — ` ```html` フェンスのブロックは横並びでライブプレビューされる。
+- 🌗 **ライト / ダークテーマ** — モノクロデザインで邪魔をしない。
 
-## ディレクトリ構成
-
-```
-client/                … React SPA
-server/                … Hono API サーバー + pi-coding-agent SDK
-common-skills/         … pi-coding-agent に渡す共通 skill 集 (RO bind)
-workdir/               … pi-coding-agent の cwd・HTML artifact 出力先
-docs/                  … 機能仕様・設計メモ
-```
-
-主要なエージェント実行コードは `server/src/agent-query.ts` と `server/src/claude-agent.ts`。
-ファイル名は履歴経緯で残しているが、中身は pi-coding-agent ベース。
-
-> 本リポジトリは本番デプロイ用の IaC / CI/CD / 認証基盤を含めていない。
-> 認証や DB のクラウド永続化が必要な場合は `server/src/auth.ts` と
-> `server/src/dynamodb-sessions.ts` を差し替えてください。
-
-## ローカル開発
+## クイックスタート
 
 ### 前提
 
-- Node.js 22+
-- pnpm 10+
-- Docker Desktop
+- [Node.js 22+](https://nodejs.org/) と [pnpm 10+](https://pnpm.io/installation)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (チャット履歴用のローカル DynamoDB を起動するため)
+- [Anthropic API キー](https://console.anthropic.com/) (実エージェント応答が必要な場合。後述の *モックモード* で API キー無し動作も可能)
 
-### セットアップ
+### 1. インストール
 
 ```bash
+git clone https://github.com/reibomaru/open-cowork.git
+cd open-cowork
 pnpm install
-[ -f server/.env ] || cp server/.env.example server/.env
-[ -f client/.env ] || cat > client/.env << 'EOF'
-VITE_API_BASE_URL=http://localhost:5173
-VITE_DEV_USER_ID=dev-user-1
-EOF
-docker compose build server
 ```
 
-pi-coding-agent を介して Anthropic API を直接叩くなら API key を export:
+### 2. 設定
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+cp server/.env.example server/.env
+cp client/.env.example client/.env
 ```
 
-### 起動
+`server/.env` を開いて API キーを入れる:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 3. 起動
 
 ```bash
 pnpm dev
 ```
 
-- Frontend: <http://localhost:5173> (Vite, ネイティブ HMR)
-- Backend: <http://localhost:3000> (Docker コンテナ, `--watch` で自動再起動)
+バックエンド (Docker) と Vite 開発サーバが立ち上がります。<http://localhost:5173> を開いてチャット開始。
 
-### npm scripts
+### モックモード (API キー不要)
 
-| コマンド | 説明 |
-|---------|-----|
-| `pnpm dev` | Frontend + Backend を同時起動 |
-| `pnpm dev:client` | Frontend のみ |
-| `pnpm dev:server` | Backend コンテナのみ |
-| `pnpm build` | SPA ビルド (`client/dist/`) |
-| `pnpm check:fix` | Lint + Format (Biome) |
+API キー無しで UI を試したい場合は `server/.env` の `USE_MOCK=true` に変更してください。エージェント応答は定型文に置き換わり、課金無しでタスク / 添付 / スキルの動作を確認できます。
 
-### 環境変数
+## スキルの使い方
 
-| ファイル | 主要な設定 |
-|---------|----------|
-| `server/.env` | `USE_MOCK` (mock/実SDK切替), `DEV_USER_ID` (認証フォールバック), `DYNAMODB_TABLE_SESSIONS`, `ANTHROPIC_API_KEY`, `MODEL_PROVIDER`, `PI_AGENT_DIR` |
-| `client/.env` | `VITE_DEV_USER_ID` (認証フォールバック) |
+スキルは「再利用可能なシステムプロンプト」として読み込まれる Markdown ファイルです。`common-skills/skills/<name>/SKILL.md` に置けば次の送信から自動で認識されます。チャットでの呼び出し方:
 
-`server/.env` で `USE_MOCK=true` にするとモックエージェントが使われ、API キーなしで動作する。
+```
+/<skill-name> 続けて書きたいプロンプト
+```
 
-### DynamoDB (ローカル)
+新規チャット画面の「使えるスキル」一覧にもクリックで挿入できる形で表示されます。
 
-`pnpm dev` / `docker compose up server` で `dynamodb-local` コンテナと、`SessionsTableV2`
-相当のスキーマ (`PK=userId` / `SK=sessionId` / LSI `SessionsByUpdatedAt` / TTL は `ttl`) を作る
-`dynamodb-init` が自動起動する。
+## 設定
 
-- 永続化先: `dynamodb-local-data` volume。
-  `docker compose down` では残り、`docker compose down -v` で消える。
-- ホストから直接叩く場合 (複数 worktree で port が衝突するため host bind はしていない):
+主な設定は `server/.env` にまとまっています:
 
-  ```bash
-  docker compose run --rm \
-    -e AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000 \
-    dynamodb-init aws dynamodb scan --table-name sessions-local
-  ```
+| 変数 | 用途 |
+|------|------|
+| `ANTHROPIC_API_KEY` | Anthropic API キー |
+| `MODEL_PROVIDER` | 既定プロバイダ (`anthropic` / `amazon-bedrock` 等) |
+| `USE_MOCK` | `true` でモックエージェント、`false` で実 LLM |
+| `DEV_USER_ID` | 認証ヘッダ未指定時のフォールバック userId |
+
+全項目とコメントは `server/.env.example` を参照。
+
+## ドキュメント
+
+- [English README](./README.md)
+- [開発者ガイド](./docs/DEVELOPMENT.ja.md) — 構成、プロジェクトレイアウト、スクリプトなど
+- [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) — 基盤になっているエージェントランタイム
