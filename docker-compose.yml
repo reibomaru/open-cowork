@@ -20,8 +20,8 @@ services:
     env_file:
       - ./server/.env
     environment:
-      # pi-coding-agent のデフォルトプロバイダ。.env で上書き可。
-      - MODEL_PROVIDER=${MODEL_PROVIDER:-anthropic}
+      # pi-coding-agent のデフォルトプロバイダ。.env の MODEL_PROVIDER を透過する。
+      - MODEL_PROVIDER=${MODEL_PROVIDER:-amazon-bedrock}
       # Bash tool が spawn する shell。Dockerfile で `apk add bash` 済み。
       - SHELL=/bin/bash
       # pi-coding-agent の cwd + artifactStore の保存先を /home/node/workdir に揃える
@@ -34,6 +34,7 @@ services:
       - WIZ_CLAUDE_COMMON_PLUGIN_PATH=/mnt/open-cowork-common
       # DynamoDB Local を使う。AWS SDK v3 が尊重する標準 env で endpoint だけ差し替える。
       # 認証情報は dynamodb-init と同じ dummy で通る。
+      # Bedrock は AWS_BEARER_TOKEN_BEDROCK で httpBearerAuth を使うため dummy IAM と干渉しない。
       - AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000
       - AWS_ACCESS_KEY_ID=local
       - AWS_SECRET_ACCESS_KEY=local
