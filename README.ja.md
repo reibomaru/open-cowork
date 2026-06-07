@@ -4,6 +4,14 @@
 
 [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) を利用した AI アシスタント Web アプリケーション。
 
+<p align="center">
+  <img src="docs/screenshots/landing-light.png" alt="Open Cowork — ライトテーマ" width="900" />
+  <br />
+  <em>Welcome screen (ライト / ダークテーマ)</em>
+  <br />
+  <img src="docs/screenshots/landing-dark.png" alt="Open Cowork — ダークテーマ" width="900" />
+</p>
+
 ## 技術スタック
 
 | レイヤー | 技術 |

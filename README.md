@@ -4,6 +4,14 @@
 
 An AI assistant web application powered by [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent).
 
+<p align="center">
+  <img src="docs/screenshots/landing-light.png" alt="Open Cowork — light theme" width="900" />
+  <br />
+  <em>Welcome screen (light / dark themes)</em>
+  <br />
+  <img src="docs/screenshots/landing-dark.png" alt="Open Cowork — dark theme" width="900" />
+</p>
+
 ## Tech Stack
 
 | Layer | Technology |

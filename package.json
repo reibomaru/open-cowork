@@ -17,6 +17,7 @@
     "format:fix": "biome format --write .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
+    "screenshot": "pnpm -F client exec node ../scripts/screenshot.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
