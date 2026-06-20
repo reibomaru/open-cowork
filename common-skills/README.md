@@ -28,7 +28,7 @@ cp -R /path/to/your-skill "$DEST/your-skill"
 
 ## 同梱スキル
 
-リポジトリにはサンプルとして以下の基本スキルを含めている (いずれも `.md` だけの軽量定義):
+リポジトリにはサンプルとして以下の基本スキルを含めている。各スキルは公式 [anthropics/skills](https://github.com/anthropics/skills) のレイアウト（薄い `SKILL.md` + トリガー検証用の `evals/evals.json`）に揃えている:
 
 - `docx` … Word ドキュメント生成・編集
 - `markdown` … Markdown 作成と他形式への変換

@@ -1,0 +1,33 @@
+{
+  "skill_name": "docx",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "次の議事録を Word ファイルにまとめて",
+      "expected_output": "docx スキルが発動し、見出し付きの .docx を workdir/ に生成する",
+      "expectations": [
+        "docx skill is triggered",
+        "A .docx file is created under workdir/",
+        "The document is generated with docx (Node) or python-docx"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "この docx から本文テキストを抜き出して",
+      "expected_output": "pandoc 等で docx → テキスト/Markdown 抽出を行う",
+      "expectations": [
+        "docx skill is triggered",
+        "Text is extracted from the .docx (e.g. via pandoc)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "売上の表を集計してエクセルにして",
+      "expected_output": "成果物が表計算なので docx ではなく xlsx が適切",
+      "expectations": [
+        "docx skill is NOT triggered",
+        "xlsx is preferred for the spreadsheet deliverable"
+      ]
+    }
+  ]
+}

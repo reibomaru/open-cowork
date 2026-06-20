@@ -1,11 +1,18 @@
 ---
 name: web-research
-description: Web ページから情報を取得して要約・整形する。URL リストの一括取得、記事本文の抽出、複数ソースのクロスチェックに利用する。
+description: >
+  Web ページから情報を取得して要約・整形するスキル。URL の本文取得・記事抽出・複数ソースのクロスチェックに使う。
+  トリガー例: 「この URL を読んで要約して」「公式ドキュメントの該当箇所を調べて」「3 つのページを比較して」
+  「最新情報を調べてまとめて」「記事の本文だけ抜き出して」「出典つきで整理して」など、
+  URL や Web 上の情報の取得・調査・要約の依頼。引用元（URL と取得日）は必ず明示する。
+  near-miss（このスキルではない）:
+  取得した内容を Word/Excel/PDF/スライドの成果物にまとめるなら、それぞれ docx/xlsx/pdf/pptx へ。
+  ログイン必須サイトはスコープ外。
 ---
 
 # Web リサーチスキル
 
-Web 上の情報を取得・要約する。bash tool から `curl` / `lynx` などで取得し、本文抽出は Python (`markitdown` / `pandoc`) や Node.js で行う。
+Web 上の情報を取得・要約する。bash tool から `curl` で HTML を取得し、本文抽出は `pandoc` / `markitdown` (Python) で Markdown 化して行う。
 
 ## 主な用途
 
