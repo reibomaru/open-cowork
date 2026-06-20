@@ -10,14 +10,15 @@ FROM base AS dev
 # chromium 系: PDF エクスポート API (Playwright headless) に必要。
 #   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 で playwright が自動 DL するのを止め、
 #   Alpine system の /usr/bin/chromium-browser を使う。
-# 共通スキル (docs-to-markdown / docx / markdown-to-word / pptx / xlsx) 用:
+# 共通スキル (docx / markdown / pdf / pptx / web-research / xlsx) 用:
 #   python3 + py3-pip: 各スキルの Python スクリプト実行
 #   libreoffice:       docx/pptx/xlsx → PDF 変換、トラッキングチェンジ承認、
 #                      Excel 数式再計算（soffice headless）に必要
-#   pandoc:            docx → Markdown のテキスト抽出
+#   pandoc:            docx ↔ Markdown 変換、web-research の HTML → Markdown 抽出
 #   poppler-utils:     pdftoppm / pdftotext / pdfinfo（PDF → 画像 / テキスト）
+#   curl:              web-research スキルが URL の HTML を取得するため
 #   font-noto-cjk:     LibreOffice が日本語を含むドキュメントを描画するため
-RUN apk add --no-cache libgcc libstdc++ ripgrep bash \
+RUN apk add --no-cache libgcc libstdc++ ripgrep bash curl \
     chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto \
     python3 py3-pip \
     libreoffice pandoc poppler-utils \
