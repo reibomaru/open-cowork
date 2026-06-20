@@ -418,9 +418,13 @@ const routes = app
   // 認証情報が揃っていないプロバイダのモデルは除外する。
   .get("/api/models", (c) => {
     const models = getAvailableModels()
+    // DEFAULT_MODEL_ID が利用可能モデルに含まれない場合は先頭モデルにフォールバック
+    const defaultId = models.some((m) => m.id === DEFAULT_MODEL_ID)
+      ? DEFAULT_MODEL_ID
+      : (models[0]?.id ?? DEFAULT_MODEL_ID)
     return c.json({
       models: models.map(({ id, label, description }) => ({ id, label, description })),
-      defaultModelId: DEFAULT_MODEL_ID,
+      defaultModelId: defaultId,
     })
   })
 
