@@ -11,7 +11,7 @@ import { formatMcpToolName, streamClaudeAgentResponse, summarizeToolInput } from
 import * as dao from "./dynamodb-sessions"
 import { MAX_FILE_SIZE, UploadError, type UploadedFile, fileStore } from "./file-store"
 import { createLogger } from "./logger"
-import { DEFAULT_MODEL_ID, MODELS, MODEL_IDS } from "./models"
+import { MODEL_IDS, getAvailableModels, getDefaultModelId } from "./models"
 import { SkillError, skillStore } from "./skill-store"
 import type { Session, StoredMessage } from "./types"
 import { SERVER_VERSION } from "./version"
@@ -414,11 +414,13 @@ const routes = app
   })
 
   // --- Models ---
-  // bedrockId はサーバ内部の解決にしか使わないので id / label / description のみ返す。
+  // provider / model は内部解決用なので id / label / description のみ返す。
+  // 認証情報が揃っていないプロバイダのモデルは除外する。
   .get("/api/models", (c) => {
+    const models = getAvailableModels()
     return c.json({
-      models: MODELS.map(({ id, label, description }) => ({ id, label, description })),
-      defaultModelId: DEFAULT_MODEL_ID,
+      models: models.map(({ id, label, description }) => ({ id, label, description })),
+      defaultModelId: getDefaultModelId(),
     })
   })
 
@@ -441,7 +443,7 @@ const routes = app
   .post(
     "/api/sessions",
     // クライアントが「次に作るセッションのモデル」を選んでいれば JSON で渡す。
-    // 渡されなければサーバ既定 (DEFAULT_MODEL_ID) を使う。
+    // 渡されなければサーバ既定 (getDefaultModelId()) を使う。
     zValidator(
       "json",
       z
@@ -461,7 +463,7 @@ const routes = app
         createdAt: now,
         updatedAt: now,
         status: "active",
-        model: body?.model ?? DEFAULT_MODEL_ID,
+        model: body?.model ?? getDefaultModelId(),
         permissionMode: "ask",
       }
       await dao.putSession(session)

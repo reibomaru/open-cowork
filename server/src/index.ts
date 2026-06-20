@@ -3,6 +3,7 @@ import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { authMiddleware } from "./auth"
 import { createLogger } from "./logger"
+import { initAvailableModels } from "./models"
 import routes from "./routes"
 
 // docker-compose や entrypoint で WORKDIR_USER を渡したときは Node 起動後にそちらへ
@@ -60,6 +61,10 @@ app.get("/api/me", (c) => {
 app.route("/", routes)
 
 const PORT = Number(process.env.PORT) || 3000
+
+// プロバイダの疎通チェックを完了してからリクエストを受け付ける。
+// ping は並行実行されるため通常 数秒 で完了する。
+await initAvailableModels()
 
 const server = serve({ fetch: app.fetch, port: PORT }, () => {
   log.info("Server started", { port: PORT })
