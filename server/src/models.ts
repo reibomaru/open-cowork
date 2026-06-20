@@ -10,6 +10,14 @@
 //            個別に override したい場合は CLAUDE_MODEL_* / CLAUDE_MODEL_*_PROVIDER を使う。
 // Gemini 系: GEMINI_MODEL_*_PROVIDER (既定 "google") と GEMINI_MODEL_* で個別に上書き可能。
 //            認証には GEMINI_API_KEY 環境変数を設定する。
+//
+// 起動時に各プロバイダの認証情報 (API キーなど) の有無をチェックし、
+// 利用可能なプロバイダのモデルのみ /api/models で返す。
+
+import { getEnvApiKey } from "@earendil-works/pi-ai"
+import { createLogger } from "./logger"
+
+const log = createLogger("models")
 
 export interface ModelDescriptor {
   id: string
@@ -81,6 +89,64 @@ export const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL ?? "claude-opus-4-7"
 
 export function isValidModelId(id: string): boolean {
   return MODELS.some((m) => m.id === id)
+}
+
+// ── プロバイダ利用可能性チェック ──
+
+/**
+ * 指定プロバイダが利用可能か (必要な認証情報が env に設定されているか) を返す。
+ *
+ * - pi-ai の getEnvApiKey が認識するプロバイダ (anthropic, google, openai, amazon-bedrock 等)
+ *   はそちらに委譲する。
+ * - ollama はリモート API キーが不要なので OLLAMA_BASE_URL の存在で判定する。
+ */
+function isProviderAvailable(provider: string): boolean {
+  if (provider === "ollama") {
+    return !!process.env.OLLAMA_BASE_URL
+  }
+  return !!getEnvApiKey(provider)
+}
+
+/** 利用可能プロバイダに絞った MODELS の部分集合。起動時に 1 回計算しキャッシュする。 */
+let _availableModels: ModelDescriptor[] | null = null
+
+/**
+ * 認証情報が揃っているプロバイダのモデルだけを返す。
+ * 結果は起動時に固定される (env は実行中に変わらない想定)。
+ */
+export function getAvailableModels(): readonly ModelDescriptor[] {
+  if (_availableModels) return _availableModels
+
+  const providers = new Set(MODELS.map((m) => m.provider))
+  const available = new Set<string>()
+  const unavailable: string[] = []
+
+  for (const p of providers) {
+    if (isProviderAvailable(p)) {
+      available.add(p)
+    } else {
+      unavailable.push(p)
+    }
+  }
+
+  log.info("provider availability check", {
+    available: [...available],
+    unavailable,
+  })
+
+  _availableModels = MODELS.filter((m) => available.has(m.provider))
+
+  if (_availableModels.length === 0) {
+    log.warn("no providers available — all models will be listed but may fail at runtime")
+    _availableModels = [...MODELS]
+  }
+
+  return _availableModels
+}
+
+/** getAvailableModels() の結果に含まれる id か判定する。 */
+export function isAvailableModelId(id: string): boolean {
+  return getAvailableModels().some((m) => m.id === id)
 }
 
 /**

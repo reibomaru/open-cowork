@@ -11,7 +11,7 @@ import { formatMcpToolName, streamClaudeAgentResponse, summarizeToolInput } from
 import * as dao from "./dynamodb-sessions"
 import { MAX_FILE_SIZE, UploadError, type UploadedFile, fileStore } from "./file-store"
 import { createLogger } from "./logger"
-import { DEFAULT_MODEL_ID, MODELS, MODEL_IDS } from "./models"
+import { DEFAULT_MODEL_ID, MODEL_IDS, getAvailableModels } from "./models"
 import { SkillError, skillStore } from "./skill-store"
 import type { Session, StoredMessage } from "./types"
 import { SERVER_VERSION } from "./version"
@@ -414,10 +414,12 @@ const routes = app
   })
 
   // --- Models ---
-  // bedrockId はサーバ内部の解決にしか使わないので id / label / description のみ返す。
+  // provider / model は内部解決用なので id / label / description のみ返す。
+  // 認証情報が揃っていないプロバイダのモデルは除外する。
   .get("/api/models", (c) => {
+    const models = getAvailableModels()
     return c.json({
-      models: MODELS.map(({ id, label, description }) => ({ id, label, description })),
+      models: models.map(({ id, label, description }) => ({ id, label, description })),
       defaultModelId: DEFAULT_MODEL_ID,
     })
   })
