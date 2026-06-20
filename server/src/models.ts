@@ -27,9 +27,8 @@ export interface ModelDescriptor {
   model: string
 }
 
-// Claude 系の既定 provider。anthropic API key (ANTHROPIC_API_KEY) を使う想定。
-// Bedrock を使う場合は MODEL_PROVIDER=bedrock を設定し、AWS 認証を別途用意する。
-const DEFAULT_PROVIDER = process.env.MODEL_PROVIDER ?? "anthropic"
+// 既定 provider。Ollama (OpenAI 互換) を使う想定。
+const DEFAULT_PROVIDER = process.env.MODEL_PROVIDER ?? "ollama"
 
 // Gemini 系の既定 provider。pi-ai の "google" プロバイダ (GEMINI_API_KEY) を使う。
 const DEFAULT_GEMINI_PROVIDER = process.env.GEMINI_PROVIDER ?? "google"
@@ -37,25 +36,11 @@ const DEFAULT_GEMINI_PROVIDER = process.env.GEMINI_PROVIDER ?? "google"
 export const MODELS = [
   // ── Claude ──
   {
-    id: "claude-opus-4-7",
-    label: "Opus",
-    description: "最高性能・最高コスト。複雑な分析や設計タスク向け。",
-    provider: process.env.CLAUDE_MODEL_OPUS_PROVIDER ?? DEFAULT_PROVIDER,
-    model: process.env.CLAUDE_MODEL_OPUS ?? "claude-opus-4-5",
-  },
-  {
-    id: "claude-sonnet-4-6",
-    label: "Sonnet",
-    description: "性能とコストのバランス型。日常的なタスクの標準モデル。",
-    provider: process.env.CLAUDE_MODEL_SONNET_PROVIDER ?? DEFAULT_PROVIDER,
-    model: process.env.CLAUDE_MODEL_SONNET ?? process.env.CLAUDE_MODEL ?? "claude-sonnet-4-5",
-  },
-  {
-    id: "claude-haiku-4-5",
-    label: "Haiku",
-    description: "最速・最低コスト。簡易なタスクや大量処理向け。",
-    provider: process.env.CLAUDE_MODEL_HAIKU_PROVIDER ?? DEFAULT_PROVIDER,
-    model: process.env.CLAUDE_MODEL_HAIKU ?? "claude-haiku-4-5",
+    id: "gemma4-12b",
+    label: "Gemma 4 12B",
+    description: "Ollama ローカル実行。高速・無料。汎用タスク向け。",
+    provider: process.env.OLLAMA_MODEL_PROVIDER ?? DEFAULT_PROVIDER,
+    model: process.env.OLLAMA_MODEL ?? "gemma4:12b",
   },
   // ── Gemini ──
   {
@@ -73,11 +58,11 @@ export const MODELS = [
     model: process.env.GEMINI_MODEL_FLASH ?? "gemini-2.5-flash",
   },
   {
-    id: "gemini-2.0-flash-lite",
+    id: "gemini-2.5-flash-lite",
     label: "Gemini Flash Lite",
     description: "Gemini 最軽量。簡易タスクや大量処理向け。",
     provider: process.env.GEMINI_MODEL_FLASH_LITE_PROVIDER ?? DEFAULT_GEMINI_PROVIDER,
-    model: process.env.GEMINI_MODEL_FLASH_LITE ?? "gemini-2.0-flash-lite",
+    model: process.env.GEMINI_MODEL_FLASH_LITE ?? "gemini-2.5-flash-lite",
   },
 ] as const satisfies readonly ModelDescriptor[]
 
@@ -85,13 +70,11 @@ export type ModelId = (typeof MODELS)[number]["id"]
 
 export const MODEL_IDS = MODELS.map((m) => m.id) as [ModelId, ...ModelId[]]
 
-// env で指定されたデフォルトモデル候補。initAvailableModels() で利用可能性を検証する。
-const _configuredDefault = process.env.DEFAULT_MODEL ?? "claude-opus-4-7"
+export const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL ?? "gemma4-12b"
 
-// initAvailableModels() で確定する実効デフォルトモデル ID。
-let _resolvedDefaultModelId: string = _configuredDefault
+const _configuredDefault = DEFAULT_MODEL_ID
+let _resolvedDefaultModelId: string = DEFAULT_MODEL_ID
 
-/** 利用可能モデルの中から選ばれたデフォルトモデル ID を返す。 */
 export function getDefaultModelId(): string {
   return _resolvedDefaultModelId
 }
@@ -205,7 +188,10 @@ export async function initAvailableModels(): Promise<void> {
 
   // 各プロバイダを並行して問い合わせ
   const results = await Promise.all(
-    providers.map(async (p) => ({ provider: p, modelIds: await fetchAvailableModelIds(p) })),
+    providers.map(async (p) => ({
+      provider: p,
+      modelIds: await fetchAvailableModelIds(p),
+    })),
   )
 
   const providerModels = new Map<string, Set<string>>()
@@ -269,10 +255,27 @@ export function isAvailableModelId(id: string): boolean {
 }
 
 /**
+ * pi のセッションファイルに記録される model_change エントリの (provider, modelId) を
+ * カタログ上の {id, label} に解決する。カタログに無い (過去に使った廃止モデル等) 場合は
+ * raw な modelId をそのまま id / label に使う。
+ */
+export function resolveModelLabel(
+  provider: string,
+  modelId: string,
+): { id: string; label: string } {
+  const matches = MODELS.filter((m) => m.model === modelId)
+  const m = matches.find((mm) => mm.provider === provider) ?? matches[0]
+  return m ? { id: m.id, label: m.label } : { id: modelId, label: modelId }
+}
+
+/**
  * 公開 model id から pi-coding-agent SDK 向けの {provider, model} を返す。
  * 不明な id はフォールバック (getDefaultModelId(), 無ければ先頭) に解決する。
  */
-export function resolvePiModel(modelId: string): { provider: string; model: string } {
+export function resolvePiModel(modelId: string): {
+  provider: string
+  model: string
+} {
   const m = MODELS.find((mm) => mm.id === modelId)
   if (!m) {
     const fallback = MODELS.find((mm) => mm.id === _resolvedDefaultModelId) ?? MODELS[0]

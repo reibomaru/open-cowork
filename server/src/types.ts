@@ -86,4 +86,9 @@ export interface StoredMessage {
   attachments?: MessageAttachmentInfo[]
   /** この message から参照された skill の chip 情報。skill_invoked SSE と同じ形を取る。 */
   skillReferences?: SkillReferenceInfo[]
+  /**
+   * この assistant メッセージを生成したモデル。pi セッションの model_change エントリから
+   * 復元する。user メッセージや model 未確定のものでは undefined。
+   */
+  model?: { id: string; label: string }
 }

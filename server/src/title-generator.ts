@@ -1,12 +1,21 @@
-import { type KnownProvider, complete, getModel } from "@earendil-works/pi-ai"
+import {
+  type Api,
+  type KnownProvider,
+  type Model,
+  complete,
+  getEnvApiKey,
+  getModel,
+} from "@earendil-works/pi-ai"
 import { createLogger, serializeError } from "./logger"
 
 const log = createLogger("title-generator")
 
-// セッションタイトル要約用の Haiku。pi-ai 経由で anthropic provider を叩く。
-// Bedrock を使いたい場合は環境変数で TITLE_GEN_PROVIDER=bedrock 等に切り替える。
-const TITLE_GEN_PROVIDER = process.env.TITLE_GEN_PROVIDER ?? "anthropic"
-const TITLE_GEN_MODEL = process.env.TITLE_GEN_MODEL ?? "claude-haiku-4-5"
+// セッションタイトル要約用モデル。コスト・速度重視で lite 系モデルを既定にする。
+// getModel() は KnownProvider のみ解決するため、カスタムプロバイダ (ollama 等) の場合は
+// Model オブジェクトを手動構築してフォールバックする。
+const TITLE_GEN_PROVIDER = process.env.TITLE_GEN_PROVIDER ?? "google"
+const TITLE_GEN_MODEL = process.env.TITLE_GEN_MODEL ?? "gemini-2.5-flash-lite"
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://host.docker.internal:11434/v1"
 
 const HAIKU_TIMEOUT_MS = 5000
 const MAX_USER_CHARS = 2000
@@ -22,9 +31,10 @@ You write very short, factual titles for chat sessions in a sidebar.
 
 # Requirements
 - Output exactly ONE noun phrase as the title and nothing else.
+- Summarize the user's first instruction and the assistant's reply into the title.
 - Match the dominant language of the conversation:
-  - If the user message + assistant reply are mostly in Japanese, output a Japanese title (15 文字程度・最大 25 文字).
-  - If they are mostly in English, output an English title (around 4–6 words, max 50 characters).
+  - If the user message + assistant reply are mostly in Japanese, output a Japanese title (20 文字程度・最大 25 文字).
+  - If they are mostly in English, output an English title (around 5 words, max 40 characters).
 - No punctuation, no quotes, no emojis, no trailing "..." or "…".
 - Specific enough that someone scanning the sidebar knows what the session is about.
 - Do not include any prefix like "Title:" or any explanation. Just the title text.
@@ -74,18 +84,37 @@ export async function generateSessionTitle(
     else externalSignal.addEventListener("abort", onExternalAbort, { once: true })
   }
   try {
-    const model = getModel(TITLE_GEN_PROVIDER as KnownProvider, TITLE_GEN_MODEL as never)
-    if (!model) {
-      log.warn("title-generator: model not found", {
-        provider: TITLE_GEN_PROVIDER,
-        model: TITLE_GEN_MODEL,
-      })
-      return null
+    // KnownProvider ならビルトインカタログから取得、なければカスタム Model を構築
+    const model: Model<Api> | undefined = getModel(
+      TITLE_GEN_PROVIDER as KnownProvider,
+      TITLE_GEN_MODEL as never,
+    ) as Model<Api> | undefined
+    const resolved: Model<Api> = model ?? {
+      id: TITLE_GEN_MODEL,
+      name: TITLE_GEN_MODEL,
+      api: "openai-completions" as Api,
+      provider: TITLE_GEN_PROVIDER,
+      baseUrl: OLLAMA_BASE_URL,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 131072,
+      maxTokens: 8192,
+      compat: {
+        supportsStore: false,
+        supportsDeveloperRole: false,
+        supportsReasoningEffort: false,
+        supportsStrictMode: false,
+        supportsLongCacheRetention: false,
+      },
     }
+    // provider に応じた API キーを解決する (google→GEMINI_API_KEY 等)。ollama 等の
+    // 認証不要プロバイダは任意の非空文字列で通るため "ollama" にフォールバックする。
+    const apiKey = getEnvApiKey(TITLE_GEN_PROVIDER) ?? "ollama"
     const result = await complete(
-      model,
+      resolved,
       { messages: [{ role: "user", content: prompt, timestamp: Date.now() }] },
-      { maxTokens: 80, temperature: 0.2, signal: controller.signal },
+      { maxTokens: 80, temperature: 0.2, signal: controller.signal, apiKey },
     )
     const textBlock = result.content.find((c) => c.type === "text")
     return sanitize(textBlock?.text)

@@ -1,6 +1,7 @@
 import clsx from "clsx"
-import { AlertCircle, FileText, Loader2 } from "lucide-react"
+import { AlertCircle, FileText, Loader2, Sparkles } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
+import { useT } from "../../i18n"
 import { api } from "../../lib/api"
 import { useMessageStore } from "../../store/message-store"
 import { useUIStore } from "../../store/ui-store"
@@ -9,6 +10,7 @@ import type { Plan } from "../../types/plan"
 import { PlanDisplay } from "../plan/PlanDisplay"
 import { SubAgentPanel } from "../subagent/SubAgentPanel"
 import { ToolCallBlock } from "../tool-calls/ToolCallBlock"
+import { Tooltip } from "../ui/Tooltip"
 import { HtmlBlockRenderer } from "./HtmlBlockRenderer"
 import { SkillReferenceChip } from "./SkillReferenceChip"
 import { StreamingText } from "./StreamingText"
@@ -153,6 +155,7 @@ function groupContentParts(parts: MessageContentPart[]): RenderGroup[] {
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const t = useT()
   const isUser = message.role === "user"
   const theme = useUIStore((s) => s.theme)
   const isLight = theme === "light"
@@ -230,6 +233,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const lastPart = message.contentParts[message.contentParts.length - 1]
   const trailingTextPart = lastPart?.type === "text" ? lastPart : null
 
+  // モデルバッジは実際の返答テキストを持つメッセージにのみ出す。tool 実行だけの
+  // (skillReferences / tool_call のみで text を持たない) メッセージには付けない。
+  const hasTextReply = message.contentParts.some(
+    (p) => p.type === "text" && p.text.trim().length > 0,
+  )
+
   return (
     <>
       {message.skillReferences.length > 0 && (
@@ -294,6 +303,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </div>
         )
       })}
+      {message.model && !message.isStreaming && hasTextReply && (
+        <div className="w-full px-4 pb-2">
+          <Tooltip label={t("chat.modelBadge.tooltip")}>
+            <span className="inline-flex items-center gap-1 text-xs text-secondary whitespace-nowrap">
+              <Sparkles size={12} />
+              <span>{message.model.label}</span>
+            </span>
+          </Tooltip>
+        </div>
+      )}
     </>
   )
 }

@@ -169,6 +169,9 @@ export const messages = {
         label: "使用量",
         total: "{{tokens}} トークン · ${{cost}}",
       },
+      modelBadge: {
+        tooltip: "この回答を生成したモデル",
+      },
     },
     upload: {
       attach: "ファイルを添付",
@@ -402,6 +405,9 @@ export const messages = {
       usage: {
         label: "Usage",
         total: "{{tokens}} tokens · ${{cost}}",
+      },
+      modelBadge: {
+        tooltip: "Model that generated this reply",
       },
     },
     upload: {

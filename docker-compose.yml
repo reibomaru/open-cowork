@@ -19,9 +19,14 @@ services:
       - "3000:3000"
     env_file:
       - ./server/.env
+    extra_hosts:
+      # ホストの Ollama (localhost:11434) にコンテナ内からアクセスするためのエイリアス
+      - "host.docker.internal:host-gateway"
     environment:
       # pi-coding-agent のデフォルトプロバイダ。.env の MODEL_PROVIDER を透過する。
-      - MODEL_PROVIDER=${MODEL_PROVIDER:-amazon-bedrock}
+      - MODEL_PROVIDER=${MODEL_PROVIDER:-ollama}
+      # Ollama ベース URL (Docker 内からホストへ)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
       # Bash tool が spawn する shell。Dockerfile で `apk add bash` 済み。
       - SHELL=/bin/bash
       # pi-coding-agent の cwd + artifactStore の保存先を /home/node/workdir に揃える
@@ -32,9 +37,10 @@ services:
       # 共通 Skills (RO bind) を pi-coding-agent (skillPaths) に伝える。
       # common-skills マウントを外す場合はこの行も外す。
       - WIZ_CLAUDE_COMMON_PLUGIN_PATH=/mnt/open-cowork-common
+      # SearXNG (web search tool)
+      - SEARXNG_BASE_URL=http://searxng:8080
       # DynamoDB Local を使う。AWS SDK v3 が尊重する標準 env で endpoint だけ差し替える。
       # 認証情報は dynamodb-init と同じ dummy で通る。
-      # Bedrock は AWS_BEARER_TOKEN_BEDROCK で httpBearerAuth を使うため dummy IAM と干渉しない。
       - AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000
       - AWS_ACCESS_KEY_ID=local
       - AWS_SECRET_ACCESS_KEY=local
@@ -42,6 +48,14 @@ services:
     depends_on:
       dynamodb-init:
         condition: service_completed_successfully
+      searxng:
+        condition: service_started
+
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    # host port は意図的に bind しない。server コンテナから http://searxng:8080 で到達できれば十分。
 
   # ローカル開発用 DynamoDB。Sessions テーブルは server/.env の
   # DYNAMODB_TABLE_SESSIONS（既定: sessions-local）に対応する。

@@ -7,11 +7,11 @@ import { streamSSE } from "hono/streaming"
 import { v4 as uuid } from "uuid"
 import { z } from "zod"
 import { artifactStore } from "./artifact-store"
-import { formatMcpToolName, streamClaudeAgentResponse, summarizeToolInput } from "./claude-agent"
 import * as dao from "./dynamodb-sessions"
 import { MAX_FILE_SIZE, UploadError, type UploadedFile, fileStore } from "./file-store"
 import { createLogger } from "./logger"
-import { MODEL_IDS, getAvailableModels, getDefaultModelId } from "./models"
+import { MODEL_IDS, getAvailableModels, getDefaultModelId, resolveModelLabel } from "./models"
+import { formatMcpToolName, streamClaudeAgentResponse, summarizeToolInput } from "./pi-agent"
 import { SkillError, skillStore } from "./skill-store"
 import type { Session, StoredMessage } from "./types"
 import { SERVER_VERSION } from "./version"
@@ -53,6 +53,19 @@ async function getOwnedSession(sessionId: string, userId: string): Promise<Sessi
   const session = await dao.getSession(userId, sessionId)
   if (!session || session.ownerId !== userId) return null
   return session
+}
+
+/**
+ * pi のセッションエントリが model_change なら {provider, modelId} を返す。
+ * getBranch() は root → leaf 順なので、走査しながら直近の model_change を「現在のモデル」
+ * として保持し、後続の assistant メッセージに紐付けることで「どのモデルが回答したか」を復元する。
+ */
+function readModelChange(entry: unknown): { provider: string; modelId: string } | null {
+  if (!entry || typeof entry !== "object") return null
+  const e = entry as { type?: string; provider?: unknown; modelId?: unknown }
+  if (e.type !== "model_change") return null
+  if (typeof e.provider !== "string" || typeof e.modelId !== "string") return null
+  return { provider: e.provider, modelId: e.modelId }
 }
 
 /**
@@ -526,9 +539,21 @@ const routes = app
       // 絶対パスを保存している (Claude Agent SDK 時代の "UUID + dir" とは別の identifier)。
       const sm = SessionManager.open(session.sdkSessionId)
       const entries = sm.getBranch() // root → 現在の leaf までのパス
-      const stored = entries
-        .map((entry: unknown) => normalizePiEntry(entry, id))
-        .filter((m: StoredMessage | null): m is StoredMessage => m !== null)
+      // root → leaf 順に走査し、直近の model_change を「現在のモデル」として保持。
+      // 以降の assistant メッセージに付与すると「どのモデルが回答したか」を復元できる。
+      const stored: StoredMessage[] = []
+      let currentModel: StoredMessage["model"]
+      for (const entry of entries) {
+        const mc = readModelChange(entry)
+        if (mc) {
+          currentModel = resolveModelLabel(mc.provider, mc.modelId)
+          continue
+        }
+        const m = normalizePiEntry(entry, id)
+        if (!m) continue
+        if (m.role === "assistant" && currentModel) m.model = currentModel
+        stored.push(m)
+      }
       relocateSlashSkillRefsToAssistant(stored)
       log.info("messages: fetched", {
         userId,
@@ -557,12 +582,13 @@ const routes = app
       z.object({
         content: z.string(),
         attachedFileIds: z.array(z.string()).optional(),
+        model: z.enum(MODEL_IDS).optional(),
       }),
     ),
     async (c) => {
       const userId = c.get("userId")
       const sessionId = c.req.param("id")
-      const { content, attachedFileIds } = c.req.valid("json")
+      const { content, attachedFileIds, model: requestModel } = c.req.valid("json")
 
       // 添付ファイルがある場合は agent に渡すプロンプトの先頭に絶対パスを差し込む。
       // Read/Glob/Grep は writableRoot 配下に限らず全許可なので、エージェント側は
@@ -605,13 +631,19 @@ const routes = app
       // 1 通目応答完了後に Haiku が走り、より良いタイトルへ置き換えるか、
       // 失敗時はこのフォールバックタイトルがそのまま残る。
       const now = Date.now()
+      const activeModel = requestModel ?? session.model
       const titlePatch =
         session.title === "New Session"
           ? {
               title: content.slice(0, 50) + (content.length > 50 ? "..." : ""),
             }
           : {}
-      await dao.patchSession(userId, sessionId, titlePatch, now)
+      await dao.patchSession(
+        userId,
+        sessionId,
+        { ...titlePatch, ...(requestModel ? { model: requestModel } : {}) },
+        now,
+      )
 
       // titleGenerated がまだ立っていなければ、この応答が完了したタイミングで Haiku を走らせる。
       // 既に Haiku が試行済 or ユーザー手動編集済のセッションは対象外。
@@ -624,7 +656,7 @@ const routes = app
         kind: "agent",
         prompt: promptForAgent,
         sessionId,
-        model: session.model,
+        model: activeModel,
         generateTitle: shouldGenerateTitle,
         userMessageText: content,
         userId,
