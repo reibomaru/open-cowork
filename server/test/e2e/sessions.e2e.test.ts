@@ -120,7 +120,7 @@ describe("Hono /api/sessions e2e", () => {
       const res = await apiFetch(app, `/api/sessions/${userASessionLatest.id}`, {
         userId: "user-a",
         method: "PATCH",
-        body: { model: "claude-haiku-4-5" },
+        body: { model: "gemini-2.5-flash" },
       })
 
       expect(res.status).toBe(200)

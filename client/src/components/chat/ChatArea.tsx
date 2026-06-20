@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { v4 as uuid } from "uuid"
 import { useSSE } from "../../hooks/use-sse"
 import { api } from "../../lib/api"
+import { getModelLabelSync, loadModels } from "../../lib/models"
 import { useMessageStore } from "../../store/message-store"
 import { useSessionStore } from "../../store/session-store"
 import { useUIStore } from "../../store/ui-store"
@@ -88,6 +89,7 @@ function hydrateMessage(m: {
   timestamp: number
   attachments?: StoredAttachmentInfo[]
   skillReferences?: StoredSkillReferenceInfo[]
+  model?: { id: string; label: string }
 }): Message {
   const { contentParts, htmlBlocks } =
     m.role === "assistant"
@@ -132,6 +134,7 @@ function hydrateMessage(m: {
     htmlBlocks,
     skillReferences,
     attachments,
+    ...(m.role === "assistant" && m.model ? { model: m.model } : {}),
     timestamp: m.timestamp,
     isStreaming: false,
   }
@@ -191,14 +194,36 @@ export function ChatArea() {
   const selectedModelId = useUIStore((s) => s.selectedModelId)
   const [isUploading, setIsUploading] = useState(false)
 
-  // URL のセッションIDと store を同期
+  // URL のセッションIDと store を同期。ルートが "/" (新規タスク) のときは activeSessionId を
+  // null に戻す。これをしないと ChatHeader が直前セッションのタイトルを表示し続ける
+  // (新規タスク遷移の中間レンダーで旧 id が復元されるため)。
   useEffect(() => {
-    if (sessionId && sessionId !== activeSessionId) {
-      setActiveSession(sessionId)
+    if (sessionId) {
+      if (sessionId !== activeSessionId) setActiveSession(sessionId)
+    } else if (activeSessionId !== null) {
+      setActiveSession(null)
     }
   }, [sessionId, activeSessionId, setActiveSession])
 
+  // メッセージのモデルバッジ用にカタログを warm しておく (ラベルを同期解決するため)。
+  useEffect(() => {
+    void loadModels().catch(() => {})
+  }, [])
+
   const currentSessionId = sessionId || null
+
+  // ライブ送信する assistant メッセージに付けるモデル。セッションの現在モデルを優先し、
+  // 無ければ UI 上の選択値にフォールバックする。ラベルは warm 済みカタログから解決する。
+  const resolveLiveModel = useCallback((): Message["model"] | undefined => {
+    const id =
+      (currentSessionId
+        ? useSessionStore.getState().sessions.find((s) => s.id === currentSessionId)?.model
+        : null) ??
+      selectedModelId ??
+      null
+    return id ? { id, label: getModelLabelSync(id) } : undefined
+  }, [currentSessionId, selectedModelId])
+
   const messages = useMemo(
     () => (currentSessionId ? messagesMap[currentSessionId] || EMPTY_MESSAGES : EMPTY_MESSAGES),
     [currentSessionId, messagesMap],
@@ -304,7 +329,7 @@ export function ChatArea() {
       } catch {
         // continue with SSE even if REST fails
       }
-      const assistantMsg = startAssistantMessage(currentSessionId)
+      const assistantMsg = startAssistantMessage(currentSessionId, resolveLiveModel())
       connect(assistantMsg.id)
     })()
   }, [
@@ -317,6 +342,7 @@ export function ChatArea() {
     updateMessageAttachments,
     removeMessage,
     startAssistantMessage,
+    resolveLiveModel,
     connect,
   ])
 
@@ -372,7 +398,7 @@ export function ChatArea() {
         // continue with SSE even if REST fails
       }
 
-      const assistantMsg = startAssistantMessage(currentSessionId)
+      const assistantMsg = startAssistantMessage(currentSessionId, resolveLiveModel())
       connect(assistantMsg.id)
       return { ok: true }
     },
@@ -382,6 +408,7 @@ export function ChatArea() {
       updateMessageAttachments,
       removeMessage,
       startAssistantMessage,
+      resolveLiveModel,
       connect,
       addSession,
       setPendingMessage,

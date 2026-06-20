@@ -4,5 +4,13 @@
       "command": "git pull origin \"${CCMANAGER_BASE_BRANCH:-main}\" && cp -n \"${CCMANAGER_GIT_ROOT}/server/.env\" server/.env && pnpm i",
       "enabled": true
     }
+  },
+  "worktree": {
+    "autoDirectory": true,
+    "autoDirectoryPattern": "../{project}-{branch}",
+    "copySessionData": true,
+    "sortByLastSession": false,
+    "autoUseDefaultBranch": false,
+    "includeRemoteBranches": false
   }
 }

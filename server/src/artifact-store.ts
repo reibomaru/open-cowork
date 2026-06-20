@@ -1,31 +1,48 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
-import { type KnownProvider, complete, getModel } from "@earendil-works/pi-ai"
+import { type Api, type KnownProvider, type Model, complete, getModel } from "@earendil-works/pi-ai"
 import { createLogger, serializeError } from "./logger"
 
 const log = createLogger("artifact-store")
 
-// 生成された HTML の内容から短い日本語タイトルを Haiku に書かせる。
+// 生成された HTML の内容から短い日本語タイトルをモデルに書かせる。
 // 失敗時は <title> タグ → "output" の順でフォールバックする。
-const HAIKU_PROVIDER = process.env.ARTIFACT_TITLE_PROVIDER ?? "anthropic"
-const HAIKU_MODEL = process.env.ARTIFACT_TITLE_MODEL ?? "claude-haiku-4-5"
+const HAIKU_PROVIDER = process.env.ARTIFACT_TITLE_PROVIDER ?? "ollama"
+const HAIKU_MODEL = process.env.ARTIFACT_TITLE_MODEL ?? "gemma4:12b"
 const HAIKU_TIMEOUT_MS = 5000
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://host.docker.internal:11434/v1"
 
 async function generateTitleWithHaiku(html: string): Promise<string | null> {
   const truncated = html.slice(0, 4000)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), HAIKU_TIMEOUT_MS)
   try {
-    const model = getModel(HAIKU_PROVIDER as KnownProvider, HAIKU_MODEL as never)
-    if (!model) {
-      log.warn("artifact-title: model not found", {
-        provider: HAIKU_PROVIDER,
-        model: HAIKU_MODEL,
-      })
-      return null
+    // KnownProvider ならビルトインカタログから取得、なければカスタム Model を構築
+    const model: Model<Api> | undefined = getModel(
+      HAIKU_PROVIDER as KnownProvider,
+      HAIKU_MODEL as never,
+    ) as Model<Api> | undefined
+    const resolved: Model<Api> = model ?? {
+      id: HAIKU_MODEL,
+      name: HAIKU_MODEL,
+      api: "openai-completions" as Api,
+      provider: HAIKU_PROVIDER,
+      baseUrl: OLLAMA_BASE_URL,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 131072,
+      maxTokens: 8192,
+      compat: {
+        supportsStore: false,
+        supportsDeveloperRole: false,
+        supportsReasoningEffort: false,
+        supportsStrictMode: false,
+        supportsLongCacheRetention: false,
+      },
     }
     const result = await complete(
-      model,
+      resolved,
       {
         messages: [
           {
@@ -35,7 +52,7 @@ async function generateTitleWithHaiku(html: string): Promise<string | null> {
           },
         ],
       },
-      { maxTokens: 80, temperature: 0.2, signal: controller.signal },
+      { maxTokens: 80, temperature: 0.2, signal: controller.signal, apiKey: "ollama" },
     )
     const textBlock = result.content.find((c) => c.type === "text")
     const text = textBlock?.text?.trim()

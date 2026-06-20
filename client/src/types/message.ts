@@ -78,6 +78,11 @@ export interface Message {
   subAgents?: SubAgent[]
   /** ユーザーが送信時に添付したファイル。assistant 側では未使用。 */
   attachments?: MessageAttachment[]
+  /**
+   * この assistant メッセージを生成したモデル。履歴は server (model_change エントリ由来)、
+   * ライブ送信時はセッションの現在モデルから補完する。user メッセージでは undefined。
+   */
+  model?: { id: string; label: string }
   timestamp: number
   isStreaming: boolean
 }

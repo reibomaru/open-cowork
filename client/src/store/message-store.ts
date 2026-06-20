@@ -29,7 +29,7 @@ interface MessageStore {
   ) => void
   /** メッセージを取り消す (アップロード失敗時のロールバック等で使用)。 */
   removeMessage: (sessionId: string, messageId: string) => void
-  startAssistantMessage: (sessionId: string) => Message
+  startAssistantMessage: (sessionId: string, model?: Message["model"]) => Message
   appendTextChunk: (sessionId: string, messageId: string, chunk: string) => void
   addToolCall: (sessionId: string, messageId: string, toolCall: ToolCall) => void
   updateToolCallOutput: (
@@ -152,7 +152,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
       }
     }),
 
-  startAssistantMessage: (sessionId) => {
+  startAssistantMessage: (sessionId, model) => {
     const msg: Message = {
       id: uuid(),
       sessionId,
@@ -162,6 +162,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
       toolCalls: [],
       htmlBlocks: [],
       skillReferences: [],
+      ...(model ? { model } : {}),
       timestamp: Date.now(),
       isStreaming: true,
     }

@@ -11,8 +11,9 @@ import { createLogger, serializeError } from "./logger"
 import { resolvePiModel } from "./models"
 import type { SSEWriter } from "./sse"
 import { generateSessionTitle } from "./title-generator"
+import { webSearchTool } from "./tools/web-search"
 
-const log = createLogger("claude-agent")
+const log = createLogger("pi-agent")
 
 // pi-coding-agent の cwd / セッションファイル出力先。
 // docker-compose は WORKDIR_USER=/home/node/workdir で export する。CLAUDE_CWD は
@@ -47,7 +48,8 @@ function buildBaseOptions(modelId: string) {
     ...(cwd ? { cwd } : {}),
     ...(PI_AGENT_DIR ? { agentDir: PI_AGENT_DIR } : {}),
     appendSystemPrompt: HTML_FENCE_INSTRUCTION,
-    tools: DEFAULT_TOOLS,
+    tools: [...DEFAULT_TOOLS, "web_search"],
+    customTools: [webSearchTool],
     ...(COMMON_SKILLS_DIR ? { skillPaths: [COMMON_SKILLS_DIR] } : {}),
   }
 }
@@ -133,7 +135,8 @@ export function summarizeToolInput(
       const url = str(input.url)
       return url ? truncate(url) : undefined
     }
-    case "websearch": {
+    case "websearch":
+    case "web_search": {
       const query = str(input.query)
       return query ? truncate(query) : undefined
     }
