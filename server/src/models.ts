@@ -85,7 +85,16 @@ export type ModelId = (typeof MODELS)[number]["id"]
 
 export const MODEL_IDS = MODELS.map((m) => m.id) as [ModelId, ...ModelId[]]
 
-export const DEFAULT_MODEL_ID = process.env.DEFAULT_MODEL ?? "claude-opus-4-7"
+// env で指定されたデフォルトモデル候補。initAvailableModels() で利用可能性を検証する。
+const _configuredDefault = process.env.DEFAULT_MODEL ?? "claude-opus-4-7"
+
+// initAvailableModels() で確定する実効デフォルトモデル ID。
+let _resolvedDefaultModelId: string = _configuredDefault
+
+/** 利用可能モデルの中から選ばれたデフォルトモデル ID を返す。 */
+export function getDefaultModelId(): string {
+  return _resolvedDefaultModelId
+}
 
 export function isValidModelId(id: string): boolean {
   return MODELS.some((m) => m.id === id)
@@ -222,8 +231,20 @@ export async function initAvailableModels(): Promise<void> {
     _availableModels = [...MODELS]
   }
 
+  // デフォルトモデルの確定: env 指定値が利用可能なら採用、そうでなければ先頭モデル
+  if (_availableModels.some((m) => m.id === _configuredDefault)) {
+    _resolvedDefaultModelId = _configuredDefault
+  } else {
+    _resolvedDefaultModelId = _availableModels[0]?.id ?? _configuredDefault
+    log.info("configured DEFAULT_MODEL is unavailable, falling back", {
+      configured: _configuredDefault,
+      resolved: _resolvedDefaultModelId,
+    })
+  }
+
   log.info("available models", {
     models: _availableModels.map((m) => m.id),
+    defaultModelId: _resolvedDefaultModelId,
   })
 }
 
@@ -241,12 +262,12 @@ export function isAvailableModelId(id: string): boolean {
 
 /**
  * 公開 model id から pi-coding-agent SDK 向けの {provider, model} を返す。
- * 不明な id はフォールバック (DEFAULT_MODEL_ID, 無ければ先頭) に解決する。
+ * 不明な id はフォールバック (getDefaultModelId(), 無ければ先頭) に解決する。
  */
 export function resolvePiModel(modelId: string): { provider: string; model: string } {
   const m = MODELS.find((mm) => mm.id === modelId)
   if (!m) {
-    const fallback = MODELS.find((mm) => mm.id === DEFAULT_MODEL_ID) ?? MODELS[0]
+    const fallback = MODELS.find((mm) => mm.id === _resolvedDefaultModelId) ?? MODELS[0]
     return { provider: fallback.provider, model: fallback.model }
   }
   return { provider: m.provider, model: m.model }

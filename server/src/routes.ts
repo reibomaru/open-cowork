@@ -11,7 +11,7 @@ import { formatMcpToolName, streamClaudeAgentResponse, summarizeToolInput } from
 import * as dao from "./dynamodb-sessions"
 import { MAX_FILE_SIZE, UploadError, type UploadedFile, fileStore } from "./file-store"
 import { createLogger } from "./logger"
-import { DEFAULT_MODEL_ID, MODEL_IDS, getAvailableModels } from "./models"
+import { MODEL_IDS, getAvailableModels, getDefaultModelId } from "./models"
 import { SkillError, skillStore } from "./skill-store"
 import type { Session, StoredMessage } from "./types"
 import { SERVER_VERSION } from "./version"
@@ -418,13 +418,9 @@ const routes = app
   // 認証情報が揃っていないプロバイダのモデルは除外する。
   .get("/api/models", (c) => {
     const models = getAvailableModels()
-    // DEFAULT_MODEL_ID が利用可能モデルに含まれない場合は先頭モデルにフォールバック
-    const defaultId = models.some((m) => m.id === DEFAULT_MODEL_ID)
-      ? DEFAULT_MODEL_ID
-      : (models[0]?.id ?? DEFAULT_MODEL_ID)
     return c.json({
       models: models.map(({ id, label, description }) => ({ id, label, description })),
-      defaultModelId: defaultId,
+      defaultModelId: getDefaultModelId(),
     })
   })
 
@@ -447,7 +443,7 @@ const routes = app
   .post(
     "/api/sessions",
     // クライアントが「次に作るセッションのモデル」を選んでいれば JSON で渡す。
-    // 渡されなければサーバ既定 (DEFAULT_MODEL_ID) を使う。
+    // 渡されなければサーバ既定 (getDefaultModelId()) を使う。
     zValidator(
       "json",
       z
@@ -467,7 +463,7 @@ const routes = app
         createdAt: now,
         updatedAt: now,
         status: "active",
-        model: body?.model ?? DEFAULT_MODEL_ID,
+        model: body?.model ?? getDefaultModelId(),
         permissionMode: "ask",
       }
       await dao.putSession(session)
