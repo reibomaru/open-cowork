@@ -3,11 +3,13 @@
 // id        : API / DB / UI で使う識別子。
 // label     : UI 表示用の短いラベル。
 // description: 用途・コスト/性能の指針。UI のヘルプテキストとして表示する。
-// provider  : pi-coding-agent / pi-ai が認識するプロバイダ名 (例: "anthropic", "openai", "google", "amazon-bedrock")。
-// model     : 上記 provider の中での model id (例: "claude-opus-4-5")。
+// provider  : pi-coding-agent / pi-ai が認識するプロバイダ名 (例: "anthropic", "openai", "google", "amazon-bedrock", "ollama")。
+// model     : 上記 provider の中での model id (例: "claude-opus-4-5", "gemini-2.5-pro")。
 //
-// MODEL_PROVIDER env で全モデルのプロバイダを一括切り替えできる。
-// 個別に override したい場合は CLAUDE_MODEL_* / CLAUDE_MODEL_*_PROVIDER を使う。
+// Claude 系: MODEL_PROVIDER env で全 Claude モデルのプロバイダを一括切り替えできる。
+//            個別に override したい場合は CLAUDE_MODEL_* / CLAUDE_MODEL_*_PROVIDER を使う。
+// Gemini 系: GEMINI_MODEL_*_PROVIDER (既定 "google") と GEMINI_MODEL_* で個別に上書き可能。
+//            認証には GEMINI_API_KEY 環境変数を設定する。
 
 export interface ModelDescriptor {
   id: string
@@ -17,11 +19,15 @@ export interface ModelDescriptor {
   model: string
 }
 
-// 既定 provider。anthropic API key (ANTHROPIC_API_KEY) を使う想定。
+// Claude 系の既定 provider。anthropic API key (ANTHROPIC_API_KEY) を使う想定。
 // Bedrock を使う場合は MODEL_PROVIDER=bedrock を設定し、AWS 認証を別途用意する。
 const DEFAULT_PROVIDER = process.env.MODEL_PROVIDER ?? "anthropic"
 
+// Gemini 系の既定 provider。pi-ai の "google" プロバイダ (GEMINI_API_KEY) を使う。
+const DEFAULT_GEMINI_PROVIDER = process.env.GEMINI_PROVIDER ?? "google"
+
 export const MODELS = [
+  // ── Claude ──
   {
     id: "claude-opus-4-7",
     label: "Opus",
@@ -42,6 +48,28 @@ export const MODELS = [
     description: "最速・最低コスト。簡易なタスクや大量処理向け。",
     provider: process.env.CLAUDE_MODEL_HAIKU_PROVIDER ?? DEFAULT_PROVIDER,
     model: process.env.CLAUDE_MODEL_HAIKU ?? "claude-haiku-4-5",
+  },
+  // ── Gemini ──
+  {
+    id: "gemini-2.5-pro",
+    label: "Gemini Pro",
+    description: "Gemini 最高性能。複雑な推論・コード生成向け。",
+    provider: process.env.GEMINI_MODEL_PRO_PROVIDER ?? DEFAULT_GEMINI_PROVIDER,
+    model: process.env.GEMINI_MODEL_PRO ?? "gemini-2.5-pro",
+  },
+  {
+    id: "gemini-2.5-flash",
+    label: "Gemini Flash",
+    description: "Gemini 高速モデル。速度とコストのバランス型。",
+    provider: process.env.GEMINI_MODEL_FLASH_PROVIDER ?? DEFAULT_GEMINI_PROVIDER,
+    model: process.env.GEMINI_MODEL_FLASH ?? "gemini-2.5-flash",
+  },
+  {
+    id: "gemini-2.0-flash-lite",
+    label: "Gemini Flash Lite",
+    description: "Gemini 最軽量。簡易タスクや大量処理向け。",
+    provider: process.env.GEMINI_MODEL_FLASH_LITE_PROVIDER ?? DEFAULT_GEMINI_PROVIDER,
+    model: process.env.GEMINI_MODEL_FLASH_LITE ?? "gemini-2.0-flash-lite",
   },
 ] as const satisfies readonly ModelDescriptor[]
 
