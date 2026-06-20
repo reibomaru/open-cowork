@@ -169,9 +169,17 @@ async function fetchAvailableModelIds(provider: string): Promise<Set<string>> {
         return ids
       }
       case "amazon-bedrock": {
-        // Bedrock は AWS SDK 経由のため軽量 ping が難しい。
-        // env チェックが通れば全モデル許可とする。
-        return getEnvApiKey("amazon-bedrock") ? new Set(["*"]) : none
+        // Bedrock は AWS SDK 経由のため軽量 HTTP ping が難しい。
+        // docker-compose では DynamoDB Local 用の dummy IAM (AWS_ACCESS_KEY_ID=local) が
+        // 設定されているため、getEnvApiKey だけでは偽陽性になる。
+        // Bedrock 固有の認証手段を明示的にチェックする。
+        const hasBedrock =
+          !!process.env.AWS_BEARER_TOKEN_BEDROCK ||
+          !!process.env.AWS_PROFILE ||
+          !!process.env.AWS_WEB_IDENTITY_TOKEN_FILE ||
+          !!process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI ||
+          !!process.env.AWS_CONTAINER_CREDENTIALS_FULL_URI
+        return hasBedrock ? new Set(["*"]) : none
       }
       default: {
         return getEnvApiKey(provider) ? new Set(["*"]) : none
