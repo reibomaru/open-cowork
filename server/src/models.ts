@@ -92,100 +92,139 @@ export function isValidModelId(id: string): boolean {
 }
 
 // ── プロバイダ疎通チェック (ping) ──
+//
+// プロバイダ単位の認証チェックだけでなく、モデル単位の存在チェックも行う。
+// Ollama のようにローカルにプルしたモデルしか使えないプロバイダでは、
+// プロバイダが alive でもモデルが無ければ利用不可として弾く。
 
 const PING_TIMEOUT_MS = 8000
 
 /**
- * プロバイダに軽量リクエストを送り、認証・接続の両方を検証する。
- * 各プロバイダの無料 or 最小コストのエンドポイントを使う。
+ * プロバイダごとに利用可能なモデル名の Set を返す。
+ * Set が空 = プロバイダ自体が利用不可。
+ * Set に "*" が含まれる = プロバイダは利用可能で、全モデルを許可 (API 系)。
  */
-async function pingProvider(provider: string): Promise<boolean> {
+async function fetchAvailableModelIds(provider: string): Promise<Set<string>> {
+  const none = new Set<string>()
   try {
     switch (provider) {
       case "google": {
         const apiKey = getEnvApiKey("google")
-        if (!apiKey) return false
-        // モデルメタデータ取得 — 無料・API キー認証チェック込み
+        if (!apiKey) return none
+        // モデル一覧取得 — 無料・API キー認証チェック込み
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`,
           { signal: AbortSignal.timeout(PING_TIMEOUT_MS) },
         )
-        return res.ok
+        if (!res.ok) return none
+        const body = (await res.json()) as { models?: { name?: string }[] }
+        // name は "models/gemini-2.5-pro" 形式。"models/" を除去して id だけにする。
+        const ids = new Set<string>()
+        for (const m of body.models ?? []) {
+          if (m.name) ids.add(m.name.replace(/^models\//, ""))
+        }
+        return ids
       }
       case "anthropic": {
         const apiKey = getEnvApiKey("anthropic")
-        if (!apiKey) return false
+        if (!apiKey) return none
         const isOAuth = !!process.env.ANTHROPIC_OAUTH_TOKEN
-        // モデル一覧取得 — 無料・認証チェック込み
-        const res = await fetch("https://api.anthropic.com/v1/models?limit=1", {
+        const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
           headers: {
             ...(isOAuth ? { Authorization: `Bearer ${apiKey}` } : { "x-api-key": apiKey }),
             "anthropic-version": "2023-06-01",
           },
           signal: AbortSignal.timeout(PING_TIMEOUT_MS),
         })
-        return res.ok
+        if (!res.ok) return none
+        const body = (await res.json()) as { data?: { id?: string }[] }
+        const ids = new Set<string>()
+        for (const m of body.data ?? []) {
+          if (m.id) ids.add(m.id)
+        }
+        return ids
       }
       case "ollama": {
         const baseUrl = process.env.OLLAMA_BASE_URL
-        if (!baseUrl) return false
-        // OpenAI 互換 /models エンドポイント
+        if (!baseUrl) return none
+        // OpenAI 互換 /models — レスポンス: { data: [{ id: "gemma4:12b" }, ...] }
         const res = await fetch(`${baseUrl}/models`, {
           signal: AbortSignal.timeout(PING_TIMEOUT_MS),
         })
-        return res.ok
+        if (!res.ok) return none
+        const body = (await res.json()) as { data?: { id?: string }[] }
+        const ids = new Set<string>()
+        for (const m of body.data ?? []) {
+          if (m.id) ids.add(m.id)
+        }
+        return ids
       }
       case "amazon-bedrock": {
-        // Bedrock は AWS SDK 経由のため軽量 ping が難しい。env チェックのみ。
-        return !!getEnvApiKey("amazon-bedrock")
+        // Bedrock は AWS SDK 経由のため軽量 ping が難しい。
+        // env チェックが通れば全モデル許可とする。
+        return getEnvApiKey("amazon-bedrock") ? new Set(["*"]) : none
       }
       default: {
-        return !!getEnvApiKey(provider)
+        return getEnvApiKey(provider) ? new Set(["*"]) : none
       }
     }
   } catch (err) {
     log.warn(`ping failed for provider "${provider}"`, {
       error: err instanceof Error ? err.message : String(err),
     })
-    return false
+    return none
   }
 }
 
-/** 利用可能プロバイダに絞った MODELS の部分集合。initAvailableModels() で確定する。 */
+/** 利用可能モデルのキャッシュ。initAvailableModels() で確定する。 */
 let _availableModels: ModelDescriptor[] | null = null
 
 /**
- * 各プロバイダへ ping を送り、利用可能なモデル一覧を確定する。
+ * 各プロバイダへ ping を送り、モデル単位で利用可能性を確定する。
  * サーバ起動時に 1 回だけ呼ぶこと。
  */
 export async function initAvailableModels(): Promise<void> {
   const providers = [...new Set(MODELS.map((m) => m.provider))]
 
+  // 各プロバイダを並行して問い合わせ
   const results = await Promise.all(
-    providers.map(async (p) => ({ provider: p, ok: await pingProvider(p) })),
+    providers.map(async (p) => ({ provider: p, modelIds: await fetchAvailableModelIds(p) })),
   )
 
-  const available = new Set<string>()
+  const providerModels = new Map<string, Set<string>>()
+  for (const { provider, modelIds } of results) {
+    providerModels.set(provider, modelIds)
+  }
+
+  // ログ出力
+  const available: string[] = []
   const unavailable: string[] = []
-  for (const { provider, ok } of results) {
-    if (ok) {
-      available.add(provider)
+  for (const p of providers) {
+    const ids = providerModels.get(p)
+    if (ids && ids.size > 0) {
+      available.push(ids.has("*") ? p : `${p} (${[...ids].join(", ")})`)
     } else {
-      unavailable.push(provider)
+      unavailable.push(p)
     }
   }
+  log.info("provider availability (ping)", { available, unavailable })
 
-  log.info("provider availability (ping)", {
-    available: [...available],
-    unavailable,
+  // モデル単位でフィルタ: "*" ならプロバイダの全モデル許可、それ以外は id が含まれるもののみ
+  _availableModels = MODELS.filter((m) => {
+    const ids = providerModels.get(m.provider)
+    if (!ids || ids.size === 0) return false
+    if (ids.has("*")) return true
+    return ids.has(m.model)
   })
 
-  _availableModels = MODELS.filter((m) => available.has(m.provider))
-
   if (_availableModels.length === 0) {
-    log.warn("no providers available — all models will be listed but may fail at runtime")
+    log.warn("no models available — all models will be listed but may fail at runtime")
     _availableModels = [...MODELS]
   }
+
+  log.info("available models", {
+    models: _availableModels.map((m) => m.id),
+  })
 }
 
 /**
