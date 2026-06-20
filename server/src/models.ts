@@ -91,45 +91,91 @@ export function isValidModelId(id: string): boolean {
   return MODELS.some((m) => m.id === id)
 }
 
-// ── プロバイダ利用可能性チェック ──
+// ── プロバイダ疎通チェック (ping) ──
+
+const PING_TIMEOUT_MS = 8000
 
 /**
- * 指定プロバイダが利用可能か (必要な認証情報が env に設定されているか) を返す。
- *
- * - pi-ai の getEnvApiKey が認識するプロバイダ (anthropic, google, openai, amazon-bedrock 等)
- *   はそちらに委譲する。
- * - ollama はリモート API キーが不要なので OLLAMA_BASE_URL の存在で判定する。
+ * プロバイダに軽量リクエストを送り、認証・接続の両方を検証する。
+ * 各プロバイダの無料 or 最小コストのエンドポイントを使う。
  */
-function isProviderAvailable(provider: string): boolean {
-  if (provider === "ollama") {
-    return !!process.env.OLLAMA_BASE_URL
+async function pingProvider(provider: string): Promise<boolean> {
+  try {
+    switch (provider) {
+      case "google": {
+        const apiKey = getEnvApiKey("google")
+        if (!apiKey) return false
+        // モデルメタデータ取得 — 無料・API キー認証チェック込み
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite?key=${apiKey}`,
+          { signal: AbortSignal.timeout(PING_TIMEOUT_MS) },
+        )
+        return res.ok
+      }
+      case "anthropic": {
+        const apiKey = getEnvApiKey("anthropic")
+        if (!apiKey) return false
+        const isOAuth = !!process.env.ANTHROPIC_OAUTH_TOKEN
+        // モデル一覧取得 — 無料・認証チェック込み
+        const res = await fetch("https://api.anthropic.com/v1/models?limit=1", {
+          headers: {
+            ...(isOAuth ? { Authorization: `Bearer ${apiKey}` } : { "x-api-key": apiKey }),
+            "anthropic-version": "2023-06-01",
+          },
+          signal: AbortSignal.timeout(PING_TIMEOUT_MS),
+        })
+        return res.ok
+      }
+      case "ollama": {
+        const baseUrl = process.env.OLLAMA_BASE_URL
+        if (!baseUrl) return false
+        // OpenAI 互換 /models エンドポイント
+        const res = await fetch(`${baseUrl}/models`, {
+          signal: AbortSignal.timeout(PING_TIMEOUT_MS),
+        })
+        return res.ok
+      }
+      case "amazon-bedrock": {
+        // Bedrock は AWS SDK 経由のため軽量 ping が難しい。env チェックのみ。
+        return !!getEnvApiKey("amazon-bedrock")
+      }
+      default: {
+        return !!getEnvApiKey(provider)
+      }
+    }
+  } catch (err) {
+    log.warn(`ping failed for provider "${provider}"`, {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return false
   }
-  return !!getEnvApiKey(provider)
 }
 
-/** 利用可能プロバイダに絞った MODELS の部分集合。起動時に 1 回計算しキャッシュする。 */
+/** 利用可能プロバイダに絞った MODELS の部分集合。initAvailableModels() で確定する。 */
 let _availableModels: ModelDescriptor[] | null = null
 
 /**
- * 認証情報が揃っているプロバイダのモデルだけを返す。
- * 結果は起動時に固定される (env は実行中に変わらない想定)。
+ * 各プロバイダへ ping を送り、利用可能なモデル一覧を確定する。
+ * サーバ起動時に 1 回だけ呼ぶこと。
  */
-export function getAvailableModels(): readonly ModelDescriptor[] {
-  if (_availableModels) return _availableModels
+export async function initAvailableModels(): Promise<void> {
+  const providers = [...new Set(MODELS.map((m) => m.provider))]
 
-  const providers = new Set(MODELS.map((m) => m.provider))
+  const results = await Promise.all(
+    providers.map(async (p) => ({ provider: p, ok: await pingProvider(p) })),
+  )
+
   const available = new Set<string>()
   const unavailable: string[] = []
-
-  for (const p of providers) {
-    if (isProviderAvailable(p)) {
-      available.add(p)
+  for (const { provider, ok } of results) {
+    if (ok) {
+      available.add(provider)
     } else {
-      unavailable.push(p)
+      unavailable.push(provider)
     }
   }
 
-  log.info("provider availability check", {
+  log.info("provider availability (ping)", {
     available: [...available],
     unavailable,
   })
@@ -140,8 +186,13 @@ export function getAvailableModels(): readonly ModelDescriptor[] {
     log.warn("no providers available — all models will be listed but may fail at runtime")
     _availableModels = [...MODELS]
   }
+}
 
-  return _availableModels
+/**
+ * 利用可能なモデル一覧を返す。initAvailableModels() 未実行時は全モデルを返す。
+ */
+export function getAvailableModels(): readonly ModelDescriptor[] {
+  return _availableModels ?? [...MODELS]
 }
 
 /** getAvailableModels() の結果に含まれる id か判定する。 */
