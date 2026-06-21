@@ -20,6 +20,9 @@ FROM base AS dev
 #   qpdf:              pdf スキルの結合 / 分割 / 回転 / 暗号化（docs のコマンド例）
 #   tesseract-ocr (+jpn data): pdf スキルのスキャン PDF OCR（pytesseract から利用）
 #   font-noto-cjk:     LibreOffice が日本語を含むドキュメントを描画するため
+# bubblewrap: 作業ディレクトリ限定セッションの bash 書込み封じ込め (FS 全体を ro-bind し
+#   作業ディレクトリだけ rw-bind して実行)。非 root + unprivileged userns 環境で動作する。
+#   利用不可な環境では confined-fs.ts が cwd スコープのみにフォールバックする。
 # pip (公式 anthropics/skills から移植したスクリプトの依存):
 #   python-pptx / python-docx / openpyxl / pandas: Office ファイルの読み書き・集計
 #   lxml / defusedxml:  office/validate.py の OOXML スキーマ検証
@@ -27,7 +30,7 @@ FROM base AS dev
 #                                   (pdf2image は poppler-utils を利用)
 #   pytesseract:        pdf スキルの OCR（tesseract バイナリのラッパ）
 #   markitdown:         docx/pptx/xlsx → Markdown のテキスト抽出
-RUN apk add --no-cache libgcc libstdc++ ripgrep bash curl \
+RUN apk add --no-cache libgcc libstdc++ ripgrep bash bubblewrap curl \
     chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto \
     python3 py3-pip \
     libreoffice pandoc poppler-utils qpdf \

@@ -12,6 +12,7 @@ import { ChatHeader } from "./ChatHeader"
 import { MessageList } from "./MessageList"
 import { PromptInput, type SendOutcome } from "./PromptInput"
 import { WelcomeScreen } from "./WelcomeScreen"
+import { WorkingDirPicker } from "./WorkingDirPicker"
 
 const EMPTY_MESSAGES: never[] = []
 
@@ -351,11 +352,14 @@ export function ChatArea() {
       // ルートページの場合: サーバーでセッションを作成して遷移。
       // 失敗ハンドリングは新ページの useEffect 側 (現状失敗は黙って捨てる)。
       if (!currentSessionId) {
-        // ユーザーが ChatHeader で選んだモデルを引き継ぐ。未選択ならサーバ既定。
-        const session = await api.createSession(selectedModelId ?? undefined)
+        // ユーザーが ChatHeader で選んだモデルと、ピッカーで選んだ作業ディレクトリを引き継ぐ。
+        const workingDir = useUIStore.getState().selectedWorkingDir ?? undefined
+        const session = await api.createSession(selectedModelId ?? undefined, workingDir)
         addSession(session)
         setPendingMessage(content)
         setPendingAttachedFiles(files)
+        // 次の新規タスクへ持ち越さないよう選択をクリアする。
+        useUIStore.getState().setSelectedWorkingDir(null)
         navigate(`/chat/${session.id}`)
         return { ok: true }
       }
@@ -433,6 +437,14 @@ export function ChatArea() {
         <WelcomeScreen />
       ) : (
         <MessageList messages={messages} />
+      )}
+
+      {!currentSessionId && (
+        <div className="px-6">
+          <div className="max-w-3xl mx-auto flex justify-start">
+            <WorkingDirPicker />
+          </div>
+        </div>
       )}
 
       <PromptInput

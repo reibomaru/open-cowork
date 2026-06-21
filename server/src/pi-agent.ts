@@ -1,3 +1,4 @@
+import { join } from "node:path"
 import { v4 as uuid } from "uuid"
 import { type AgentStreamSink, runAgentQuery } from "./agent-query"
 import { artifactStore } from "./artifact-store"
@@ -11,6 +12,7 @@ import { createLogger, serializeError } from "./logger"
 import { resolvePiModel } from "./models"
 import type { SSEWriter } from "./sse"
 import { generateSessionTitle } from "./title-generator"
+import { buildConfinedTools } from "./tools/confined-fs"
 import { webSearchTool } from "./tools/web-search"
 
 const log = createLogger("pi-agent")
@@ -41,16 +43,52 @@ When you produce HTML for the user (full pages, snippets, or any markup the user
 always wrap it in fenced code blocks tagged exactly \`\`\`html (lowercase, no spaces). \
 The closing fence must be on its own line. Do not emit bare HTML outside a fence and do not use a different language tag.`
 
-function buildBaseOptions(modelId: string) {
-  const cwd = USER_CWD
+// 作業ディレクトリ限定セッションで、編集範囲が縛られていることをモデルに伝える指示。
+const restrictedInstruction = (root: string): string => `\
+This session is restricted to a working directory. You may only create or modify files under \
+${root}. The edit, write, and bash tools will refuse writes outside this directory. Reading files \
+elsewhere is still allowed. Keep all changes within the working directory.`
+
+/**
+ * セッションの実効作業ディレクトリ。workingDir (相対パス) が指定されていれば
+ * USER_CWD 配下に解決する。未指定 / USER_CWD 未設定なら USER_CWD のまま。
+ */
+function resolveEffectiveCwd(workingDir: string | undefined): {
+  cwd: string | undefined
+  restricted: boolean
+} {
+  if (!USER_CWD || !workingDir) return { cwd: USER_CWD, restricted: false }
+  const cwd = join(USER_CWD, workingDir)
+  // 念のため: 解決後に USER_CWD と一致してしまうケース (workingDir="." 等) は制限なし扱い。
+  return cwd === USER_CWD ? { cwd: USER_CWD, restricted: false } : { cwd, restricted: true }
+}
+
+function buildBaseOptions(modelId: string, workingDir?: string) {
+  const { cwd, restricted } = resolveEffectiveCwd(workingDir)
+
+  // 制限セッションでは cwd がサブフォルダに移るため、project-scope で自動探索される
+  // 個人スキル (<USER_CWD>/.pi/skills) を additionalSkillPaths に明示追加して維持する。
+  const skillPaths = [
+    ...(COMMON_SKILLS_DIR ? [COMMON_SKILLS_DIR] : []),
+    ...(restricted && USER_CWD ? [join(USER_CWD, ".pi", "skills")] : []),
+  ]
+
+  // 制限セッションでは built-in と同名の confined な edit/write/bash を customTools で
+  // 上書きする (createAgentSession の registry は後勝ちで built-in を置き換える)。
+  const customTools =
+    restricted && cwd ? [webSearchTool, ...buildConfinedTools(cwd, cwd)] : [webSearchTool]
+
   return {
     ...resolvePiModel(modelId),
     ...(cwd ? { cwd } : {}),
     ...(PI_AGENT_DIR ? { agentDir: PI_AGENT_DIR } : {}),
-    appendSystemPrompt: HTML_FENCE_INSTRUCTION,
+    appendSystemPrompt:
+      restricted && cwd
+        ? `${HTML_FENCE_INSTRUCTION}\n\n${restrictedInstruction(cwd)}`
+        : HTML_FENCE_INSTRUCTION,
     tools: [...DEFAULT_TOOLS, "web_search"],
-    customTools: [webSearchTool],
-    ...(COMMON_SKILLS_DIR ? { skillPaths: [COMMON_SKILLS_DIR] } : {}),
+    customTools,
+    ...(skillPaths.length > 0 ? { skillPaths } : {}),
   }
 }
 
@@ -274,6 +312,8 @@ export interface StreamClaudeAgentParams {
   userId: string
   sessionId: string
   modelId: string
+  /** セッションの作業ディレクトリ (workdir root からの相対パス)。未指定は workdir 全体。 */
+  workingDir?: string
   titleGenerationInput?: { userMessage: string }
 }
 
@@ -295,11 +335,11 @@ export async function streamClaudeAgentResponse(
   stream: SSEWriter,
   params: StreamClaudeAgentParams,
 ): Promise<void> {
-  const { prompt, userId, sessionId, modelId, titleGenerationInput } = params
+  const { prompt, userId, sessionId, modelId, workingDir, titleGenerationInput } = params
   const previousSessionFile = await getSdkSessionId(userId, sessionId)
 
   const options = {
-    ...buildBaseOptions(modelId),
+    ...buildBaseOptions(modelId, workingDir),
     ...(previousSessionFile ? { resumeSessionFile: previousSessionFile } : {}),
   }
 

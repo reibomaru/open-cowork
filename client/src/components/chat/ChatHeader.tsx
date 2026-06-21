@@ -1,4 +1,10 @@
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react"
+import {
+  FolderOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react"
 import { useT } from "../../i18n"
 import { useSessionStore } from "../../store/session-store"
 import { useUIStore } from "../../store/ui-store"
@@ -32,6 +38,14 @@ export function ChatHeader() {
         <div className="flex items-center gap-3">
           {session && (
             <span className="text-sm font-medium text-primary truncate">{session.title}</span>
+          )}
+          {session?.workingDir && (
+            <Tooltip label={t("workingDir.scoped", { dir: session.workingDir })}>
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-md border border-app px-1.5 py-0.5 text-[11px] text-secondary max-w-[200px]">
+                <FolderOpen size={12} className="shrink-0" />
+                <span className="truncate">{session.workingDir}</span>
+              </span>
+            </Tooltip>
           )}
           {/* セッションがあればそのモデルを編集、無ければ次に作るセッションの既定 (preference) を編集 */}
           <ModelSelector
