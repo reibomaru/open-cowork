@@ -64,6 +64,7 @@ function recordToSession(record: SessionRecord): Session {
     status: record.status,
     model: record.model,
     permissionMode: record.permissionMode,
+    workingDir: record.workingDir,
     sdkSessionId: record.sdkSessionId,
     titleGenerated: record.titleGenerated,
     usage: recordToUsage(record),
@@ -156,6 +157,7 @@ export interface SessionPatch {
   model?: string
   permissionMode?: string
   titleGenerated?: boolean
+  workingDir?: string
 }
 
 /**
@@ -197,6 +199,11 @@ export async function patchSession(
     sets.push("#titleGenerated = :titleGenerated")
     names["#titleGenerated"] = "titleGenerated"
     values[":titleGenerated"] = patch.titleGenerated
+  }
+  if (patch.workingDir !== undefined) {
+    sets.push("#workingDir = :workingDir")
+    names["#workingDir"] = "workingDir"
+    values[":workingDir"] = patch.workingDir
   }
 
   const cmd = new UpdateCommand({

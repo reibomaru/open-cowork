@@ -117,6 +117,11 @@ interface UIStore {
   skillsRefreshTick: number
   /** 新規セッション作成時の既定モデル。ChatHeader のセレクタとも双方向に同期する。 */
   selectedModelId: ModelId | null
+  /**
+   * 新規セッション作成時に選択中の作業ディレクトリ (workdir root からの相対パス)。
+   * null なら workdir 全体 (従来挙動)。セッション作成後にクリアする。永続化はしない。
+   */
+  selectedWorkingDir: string | null
   /** 右パネルファイルツリーの skills セクション展開状態。 */
   fileTreeSkillsOpen: boolean
   /** 右パネルファイルツリーの workspace セクション展開状態。 */
@@ -139,6 +144,7 @@ interface UIStore {
   setTheme: (theme: "dark" | "light") => void
   toggleTheme: () => void
   setSelectedModelId: (id: ModelId) => void
+  setSelectedWorkingDir: (dir: string | null) => void
   setPendingInputText: (text: string | null) => void
   toggleFileTreeSkills: () => void
   toggleFileTreeWorkspace: () => void
@@ -160,6 +166,7 @@ export const useUIStore = create<UIStore>((set) => ({
   filesRefreshTick: 0,
   skillsRefreshTick: 0,
   selectedModelId: loadSelectedModelId(),
+  selectedWorkingDir: null,
   fileTreeSkillsOpen: loadBool(FILE_TREE_SKILLS_OPEN_KEY, false),
   fileTreeWorkspaceOpen: loadBool(FILE_TREE_WORKSPACE_OPEN_KEY, true),
   fileTreeSplit: loadSplit(),
@@ -195,6 +202,7 @@ export const useUIStore = create<UIStore>((set) => ({
     saveSelectedModelId(id)
     set({ selectedModelId: id })
   },
+  setSelectedWorkingDir: (dir) => set({ selectedWorkingDir: dir }),
   setPendingInputText: (text) => set({ pendingInputText: text }),
   toggleFileTreeSkills: () =>
     set((s) => {

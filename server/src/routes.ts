@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from "node:fs/promises"
+import { mkdir, readFile, readdir, stat } from "node:fs/promises"
 import { join, relative, resolve } from "node:path"
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { zValidator } from "@hono/zod-validator"
@@ -15,6 +15,7 @@ import { formatMcpToolName, streamClaudeAgentResponse, summarizeToolInput } from
 import { SkillError, skillStore } from "./skill-store"
 import type { Session, StoredMessage } from "./types"
 import { SERVER_VERSION } from "./version"
+import { normalizeWorkingDirInput, resolveWorkingDirUnder } from "./workdir-path"
 
 const log = createLogger("routes")
 
@@ -39,6 +40,8 @@ type PendingAgent = {
   userMessageText: string
   /** Haiku 呼び出しの送信元ユーザー。dao.patchSession に必要。 */
   userId: string
+  /** セッションの作業ディレクトリ (workdir root からの相対パス)。未指定は workdir 全体。 */
+  workingDir?: string
 }
 const pendingStreams: Record<string, PendingAgent> = {}
 
@@ -417,6 +420,26 @@ async function buildFileTree(absDir: string, root: string, depth: number): Promi
   return nodes
 }
 
+/**
+ * 作業ディレクトリ用の相対パスを検証し、{ abs, rel } を返す。不正 (traversal / null 文字 /
+ * 長すぎる) または WORKDIR_USER 未設定なら null。検証ロジックは workdir-path.ts に切り出し済み。
+ */
+function resolveWorkingDir(rel: string): { abs: string; rel: string } | null {
+  if (!WORKDIR_USER) return null
+  return resolveWorkingDirUnder(WORKDIR_USER, rel)
+}
+
+/** FileNode ツリーから dir ノードだけを平坦化して { path, name } 一覧にする。 */
+function flattenDirs(nodes: FileNode[]): Array<{ path: string; name: string }> {
+  const out: Array<{ path: string; name: string }> = []
+  for (const n of nodes) {
+    if (n.type !== "dir") continue
+    out.push({ path: n.path, name: n.name })
+    if (n.children) out.push(...flattenDirs(n.children))
+  }
+  return out
+}
+
 const routes = app
   // --- Version ---
   // フロントが「いま動いているサーバ版」を表示するためのエンドポイント。
@@ -462,6 +485,9 @@ const routes = app
       z
         .object({
           model: z.enum(MODEL_IDS).optional(),
+          // 作業ディレクトリ (workdir root からの相対パス)。指定セッションは編集範囲が
+          // この配下に制限される。省略 / 空文字は workdir 全体 (従来挙動)。
+          workingDir: z.string().max(512).optional(),
         })
         .optional(),
     ),
@@ -469,6 +495,26 @@ const routes = app
       const userId = c.get("userId")
       const body = c.req.valid("json")
       const now = Date.now()
+
+      // workingDir が指定されていれば検証し、存在しなければ作成する。
+      let workingDir: string | undefined
+      const rawWorkingDir = body?.workingDir ? normalizeWorkingDirInput(body.workingDir) : ""
+      if (rawWorkingDir) {
+        const resolved = resolveWorkingDir(rawWorkingDir)
+        if (!resolved) return c.json({ error: "invalid workingDir" }, 400)
+        try {
+          await mkdir(resolved.abs, { recursive: true })
+        } catch (err) {
+          log.error("failed to create workingDir", {
+            userId,
+            dir: resolved.rel,
+            error: String(err),
+          })
+          return c.json({ error: "failed to create workingDir" }, 500)
+        }
+        workingDir = resolved.rel
+      }
+
       const session: Session = {
         id: uuid(),
         ownerId: userId,
@@ -478,6 +524,7 @@ const routes = app
         status: "active",
         model: body?.model ?? getDefaultModelId(),
         permissionMode: "ask",
+        ...(workingDir ? { workingDir } : {}),
       }
       await dao.putSession(session)
       return c.json(session)
@@ -660,6 +707,7 @@ const routes = app
         generateTitle: shouldGenerateTitle,
         userMessageText: content,
         userId,
+        ...(session.workingDir ? { workingDir: session.workingDir } : {}),
       }
 
       // 旧 API 互換: client は userMessage/assistantMessageId を期待するため最低限返す。
@@ -703,6 +751,7 @@ const routes = app
         userId,
         sessionId: pending.sessionId,
         modelId: pending.model,
+        workingDir: pending.workingDir,
         titleGenerationInput: pending.generateTitle
           ? { userMessage: pending.userMessageText }
           : undefined,
@@ -964,6 +1013,42 @@ const routes = app
       },
     })
   })
+
+  // --- Working directories (project picker) ---
+  // セッション作成時の「作業ディレクトリ」候補。WORKDIR_USER 配下のサブディレクトリを
+  // 平坦化して返す。FILETREE_SKIP / 深さ上限は buildFileTree のものを流用する。
+  .get("/api/workdirs", async (c) => {
+    if (!WORKDIR_USER) return c.json({ dirs: [] })
+    const root = resolve(WORKDIR_USER)
+    try {
+      const tree = await buildFileTree(root, root, 0)
+      return c.json({ dirs: flattenDirs(tree) })
+    } catch (err) {
+      log.error("list workdirs failed", { root, error: String(err) })
+      return c.json({ dirs: [] })
+    }
+  })
+  // 「新規プロジェクトを作成」。相対パスを受け取り検証して mkdir する。
+  .post(
+    "/api/workdirs",
+    zValidator("json", z.object({ path: z.string().min(1).max(512) })),
+    async (c) => {
+      const userId = c.get("userId")
+      const { path } = c.req.valid("json")
+      const rel = normalizeWorkingDirInput(path)
+      if (!rel) return c.json({ error: "invalid path" }, 400)
+      const resolved = resolveWorkingDir(rel)
+      if (!resolved) return c.json({ error: "invalid path" }, 400)
+      try {
+        await mkdir(resolved.abs, { recursive: true })
+      } catch (err) {
+        log.error("create workdir failed", { userId, dir: resolved.rel, error: String(err) })
+        return c.json({ error: "failed to create directory" }, 500)
+      }
+      const name = resolved.rel.split("/").pop() ?? resolved.rel
+      return c.json({ path: resolved.rel, name }, 201)
+    },
+  )
 
   // --- Personal skills ---
   // workdir/.claude/skills/<name>/SKILL.md を CRUD する。SDK 側は project scope で

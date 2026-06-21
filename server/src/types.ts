@@ -9,6 +9,13 @@ export interface Session {
   model: string
   permissionMode: "ask" | "auto-accept" | "plan" | "auto"
   /**
+   * セッションの作業ディレクトリ。WORKDIR_USER (= /home/node/workdir) からの相対パス
+   * (例 "project-a" / "project-a/sub")。指定されたセッションでは pi の cwd がこの配下に
+   * なり、edit/write/bash による書き込みもこの配下に制限される。
+   * undefined / 空文字は workdir 全体 (= 従来挙動、制限なし) を意味する。
+   */
+  workingDir?: string
+  /**
    * Claude Agent SDK が初回 init で発行する内部 session_id。
    * resume パラメータとして再投入することで会話の context を継続させる。
    * 1 回目のメッセージ送信が走るまでは undefined。

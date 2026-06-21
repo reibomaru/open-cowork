@@ -17,7 +17,10 @@ FROM base AS dev
 #   pandoc:            docx → Markdown のテキスト抽出
 #   poppler-utils:     pdftoppm / pdftotext / pdfinfo（PDF → 画像 / テキスト）
 #   font-noto-cjk:     LibreOffice が日本語を含むドキュメントを描画するため
-RUN apk add --no-cache libgcc libstdc++ ripgrep bash \
+# bubblewrap: 作業ディレクトリ限定セッションの bash 書込み封じ込め (FS 全体を ro-bind し
+#   作業ディレクトリだけ rw-bind して実行)。非 root + unprivileged userns 環境で動作する。
+#   利用不可な環境では confined-fs.ts が cwd スコープのみにフォールバックする。
+RUN apk add --no-cache libgcc libstdc++ ripgrep bash bubblewrap \
     chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto \
     python3 py3-pip \
     libreoffice pandoc poppler-utils \

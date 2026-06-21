@@ -28,10 +28,25 @@ export const api = {
     if (!res.ok) throw new Error(`API error: ${res.status}`)
     return res.json()
   },
-  createSession: async (model?: ModelId) => {
+  createSession: async (model?: ModelId, workingDir?: string) => {
     const res = await client.api.sessions.$post({
-      json: model ? { model } : {},
+      json: {
+        ...(model ? { model } : {}),
+        ...(workingDir ? { workingDir } : {}),
+      },
     })
+    if (!res.ok) throw new Error(`API error: ${res.status}`)
+    return res.json()
+  },
+  // セッション作成時の作業ディレクトリ候補 (WORKDIR_USER 配下のサブディレクトリ) を取得。
+  getWorkdirs: async (): Promise<{ dirs: Array<{ path: string; name: string }> }> => {
+    const res = await client.api.workdirs.$get()
+    if (!res.ok) throw new Error(`API error: ${res.status}`)
+    return res.json()
+  },
+  // 「新規プロジェクトを作成」。相対パスを受け取りサーバ側で mkdir する。
+  createWorkdir: async (path: string): Promise<{ path: string; name: string }> => {
+    const res = await client.api.workdirs.$post({ json: { path } })
     if (!res.ok) throw new Error(`API error: ${res.status}`)
     return res.json()
   },
