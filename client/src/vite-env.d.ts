@@ -10,3 +10,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+// mammoth のブラウザ向けプリビルド（Buffer 等のポリフィル同梱）には型定義が無い。
+// 利用側で本体パッケージの型にキャストするため、ここでは any モジュールとして宣言する。
+declare module "mammoth/mammoth.browser"

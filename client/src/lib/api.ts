@@ -180,6 +180,35 @@ export const api = {
     const blob = await res.blob()
     return { blob, mimeType }
   },
+  // ファイル実体を返す content エンドポイントの URL（同一オリジン相対）を組み立てる。
+  // blob URL と違いブラウザを閉じても有効な永続 URL。画像/PDF/テキスト等の別タブ表示に使う。
+  getContentUrl: (relPath: string): string => {
+    const { userId } = useAuthStore.getState()
+    const params = new URLSearchParams({ path: relPath })
+    if (userId) params.set("userId", userId)
+    return `/api/files/content?${params.toString()}`
+  },
+  // Office 文書を PDF 変換するエンドポイントの URL（同一オリジン相対）を組み立てる。
+  // blob URL と違いブラウザを閉じても有効な永続 URL なので、iframe / 別タブ表示に使う。
+  // 直接ナビゲーションではカスタムヘッダを付けられないため userId はクエリに載せる。
+  getOfficePdfUrl: (relPath: string): string => {
+    const { userId } = useAuthStore.getState()
+    const params = new URLSearchParams({ path: relPath })
+    if (userId) params.set("userId", userId)
+    return `/api/files/preview-pdf?${params.toString()}`
+  },
+  // Office 文書 (docx/pptx/xlsx 等) をサーバ側 LibreOffice で PDF 変換して取得する。
+  // 変換成否の判定（フォールバック切替）に使う。変換は重いので呼び出し側で必要時のみ叩く。
+  fetchOfficePdfBlob: async (relPath: string): Promise<Blob> => {
+    const res = await fetch(`/api/files/preview-pdf?path=${encodeURIComponent(relPath)}`, {
+      method: "GET",
+      headers: customFetchHeaders(),
+    })
+    if (!res.ok) {
+      throw new WorkdirFileError(res.status, `convert file failed: ${res.status}`)
+    }
+    return res.blob()
+  },
   exportPdf: async (html: string, fileName: string): Promise<Blob> => {
     const res = await fetch("/api/export/pdf", {
       method: "POST",

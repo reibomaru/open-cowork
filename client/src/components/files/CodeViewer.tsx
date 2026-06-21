@@ -54,6 +54,62 @@ export function detectLanguageFromName(name: string): string {
   return EXT_TO_LANG[ext] ?? "text"
 }
 
+// シンタックスハイライト対象ではないが、プレーンテキストとして表示すべき拡張子。
+const PLAIN_TEXT_EXTS = new Set([
+  "txt",
+  "text",
+  "log",
+  "csv",
+  "tsv",
+  "env",
+  "conf",
+  "cfg",
+  "config",
+  "properties",
+  "lock",
+  "diff",
+  "patch",
+  "gitignore",
+  "gitattributes",
+  "dockerignore",
+  "editorconfig",
+  "npmrc",
+  "nvmrc",
+  "prettierrc",
+  "eslintrc",
+])
+
+// 拡張子のないテキスト設定ファイル名（ドットファイル含む）。
+const KNOWN_TEXT_BASENAMES = new Set([
+  "dockerfile",
+  "makefile",
+  "readme",
+  "license",
+  "changelog",
+  ".env",
+  ".gitignore",
+  ".gitattributes",
+  ".dockerignore",
+  ".editorconfig",
+  ".npmrc",
+  ".nvmrc",
+  ".prettierrc",
+  ".eslintrc",
+])
+
+// MIME がバイナリ判定でも、ファイル名からテキストとして表示すべきか判定する。
+// CodeViewer でハイライト可能な拡張子に加え、yaml/json/toml やプレーンテキスト系を含む。
+export function isLikelyTextFile(name: string): boolean {
+  const lower = name.toLowerCase()
+  const base = lower.includes("/") ? lower.slice(lower.lastIndexOf("/") + 1) : lower
+  if (KNOWN_TEXT_BASENAMES.has(base)) return true
+  if (base.startsWith(".env")) return true
+  if (detectLanguageFromName(name) !== "text") return true
+  const dot = base.lastIndexOf(".")
+  if (dot < 0) return false
+  return PLAIN_TEXT_EXTS.has(base.slice(dot + 1))
+}
+
 interface CodeViewerProps {
   code: string
   language: string

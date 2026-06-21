@@ -1,5 +1,8 @@
-import { readFile, readdir, stat } from "node:fs/promises"
-import { join, relative, resolve } from "node:path"
+import { execFile } from "node:child_process"
+import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { basename, join, relative, resolve } from "node:path"
+import { promisify } from "node:util"
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { zValidator } from "@hono/zod-validator"
 import { Hono } from "hono"
@@ -22,6 +25,27 @@ const log = createLogger("routes")
 // WORKDIR_USER=/home/node/workdir で export する。ローカル開発で env 未設定でも動くよう
 // CLAUDE_CWD も後方互換で拾う。
 const WORKDIR_USER = process.env.WORKDIR_USER ?? process.env.CLAUDE_CWD
+
+const execFileP = promisify(execFile)
+
+// 変換済み PDF の簡易インメモリ LRU キャッシュ。別タブ / iframe からの再取得やリロードで
+// 再変換が走らないようにする。キーは path + mtime + size（ファイル更新で自動的に無効化）。
+const PDF_CACHE_MAX_ENTRIES = 16
+const pdfCache = new Map<string, Buffer>()
+
+// LibreOffice (soffice) で PDF 変換できる Office / OpenDocument 形式。
+const PDF_CONVERTIBLE_EXTS = new Set([
+  ".docx",
+  ".doc",
+  ".pptx",
+  ".ppt",
+  ".xlsx",
+  ".xls",
+  ".xlsm",
+  ".odt",
+  ".odp",
+  ".ods",
+])
 
 type PendingAgent = {
   kind: "agent"
@@ -284,10 +308,79 @@ const EXT_TO_MIME: Record<string, string> = {
   ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 
+// EXT_TO_MIME に専用 MIME が無いが、プレーンテキストとして表示すべきコード/設定系拡張子。
+// これらを text/plain で返すと、別タブの content URL でもブラウザ内に直接表示できる。
+const PLAIN_TEXT_MIME = "text/plain; charset=utf-8"
+const TEXT_EXTS = new Set([
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "py",
+  "rb",
+  "go",
+  "rs",
+  "java",
+  "kt",
+  "cs",
+  "c",
+  "h",
+  "cpp",
+  "hpp",
+  "cc",
+  "php",
+  "sh",
+  "bash",
+  "zsh",
+  "yml",
+  "yaml",
+  "toml",
+  "ini",
+  "sql",
+  "css",
+  "scss",
+  "less",
+  "graphql",
+  "gql",
+  "log",
+  "env",
+  "conf",
+  "cfg",
+  "config",
+  "properties",
+  "lock",
+  "diff",
+  "patch",
+  "text",
+])
+// 拡張子のないテキスト設定ファイル（ドットファイル含む）。
+const TEXT_BASENAMES = new Set([
+  "dockerfile",
+  "makefile",
+  "readme",
+  "license",
+  "changelog",
+  ".gitignore",
+  ".gitattributes",
+  ".dockerignore",
+  ".editorconfig",
+  ".npmrc",
+  ".nvmrc",
+  ".prettierrc",
+  ".eslintrc",
+])
+
 function getMimeFromName(name: string): string {
-  const dot = name.lastIndexOf(".")
+  const base = (name.split("/").pop() ?? name).toLowerCase()
+  if (TEXT_BASENAMES.has(base) || base.startsWith(".env")) return PLAIN_TEXT_MIME
+  const dot = base.lastIndexOf(".")
   if (dot < 0) return "application/octet-stream"
-  return EXT_TO_MIME[name.slice(dot).toLowerCase()] ?? "application/octet-stream"
+  const known = EXT_TO_MIME[base.slice(dot)]
+  if (known) return known
+  if (TEXT_EXTS.has(base.slice(dot + 1))) return PLAIN_TEXT_MIME
+  return "application/octet-stream"
 }
 
 /**
@@ -963,6 +1056,95 @@ const routes = app
         "Content-Length": String(buf.byteLength),
       },
     })
+  })
+
+  // Office 文書 (pptx/docx/xlsx 等) を LibreOffice headless で PDF へ変換して返す。
+  // pptx のレイアウト付きプレビューに使う。/api/files/content と同じパス検証を行う。
+  .get("/api/files/preview-pdf", async (c) => {
+    const relPath = c.req.query("path")
+    if (!relPath || relPath.length > 512 || relPath.includes("\0")) {
+      return c.json({ error: "invalid path" }, 400)
+    }
+    const rootAbs = resolve(artifactStore.getDir())
+    const fileAbs = resolve(rootAbs, relPath)
+    if (fileAbs !== rootAbs && !fileAbs.startsWith(`${rootAbs}/`)) {
+      return c.json({ error: "invalid path" }, 400)
+    }
+    const fileName = relPath.split("/").pop() ?? relPath
+    const dot = fileName.lastIndexOf(".")
+    const ext = dot >= 0 ? fileName.slice(dot).toLowerCase() : ""
+    if (!PDF_CONVERTIBLE_EXTS.has(ext)) {
+      return c.json({ error: "unsupported format" }, 400)
+    }
+    let st: import("node:fs").Stats
+    try {
+      st = await stat(fileAbs)
+    } catch {
+      return c.json({ error: "Not found" }, 404)
+    }
+    if (!st.isFile()) {
+      return c.json({ error: "Not a file" }, 400)
+    }
+    // 変換は重いので content プレビューより上限を緩めるが、暴走を避けるため制限はかける。
+    const CONVERT_MAX_BYTES = 50 * 1024 * 1024
+    if (st.size > CONVERT_MAX_BYTES) {
+      return c.json({ error: "file too large for preview" }, 413)
+    }
+
+    const pdfResponse = (pdf: Buffer) =>
+      new Response(new Uint8Array(pdf), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          // 同一 URL での iframe / 別タブ / リロードはブラウザキャッシュを使わせる。
+          "Cache-Control": "private, max-age=300",
+          "Content-Length": String(pdf.byteLength),
+        },
+      })
+
+    const cacheKey = `${fileAbs}:${st.mtimeMs}:${st.size}`
+    const cached = pdfCache.get(cacheKey)
+    if (cached) {
+      // LRU: 参照したものを末尾へ移動
+      pdfCache.delete(cacheKey)
+      pdfCache.set(cacheKey, cached)
+      return pdfResponse(cached)
+    }
+
+    // 並行変換でプロファイルが競合しないよう、リクエストごとに使い捨ての作業ディレクトリ
+    // と UserInstallation プロファイルを用意する。
+    const workDir = await mkdtemp(join(tmpdir(), "office-pdf-"))
+    try {
+      await execFileP(
+        "soffice",
+        [
+          "--headless",
+          `-env:UserInstallation=file://${join(workDir, "profile")}`,
+          "--convert-to",
+          "pdf",
+          "--outdir",
+          workDir,
+          fileAbs,
+        ],
+        { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 },
+      )
+      const pdfPath = join(workDir, `${basename(fileName, ext)}.pdf`)
+      const pdf = await readFile(pdfPath)
+      pdfCache.set(cacheKey, pdf)
+      if (pdfCache.size > PDF_CACHE_MAX_ENTRIES) {
+        const oldest = pdfCache.keys().next().value
+        if (oldest !== undefined) pdfCache.delete(oldest)
+      }
+      return pdfResponse(pdf)
+    } catch (err) {
+      log.warn("office pdf conversion failed", {
+        path: relPath,
+        err: err instanceof Error ? err.message : String(err),
+      })
+      return c.json({ error: "conversion failed" }, 500)
+    } finally {
+      await rm(workDir, { recursive: true, force: true }).catch(() => {})
+    }
   })
 
   // --- Personal skills ---
