@@ -17,17 +17,21 @@ FROM base AS dev
 #   pandoc:            docx ↔ Markdown 変換、web-research の HTML → Markdown 抽出
 #   poppler-utils:     pdftoppm / pdftotext / pdfinfo（PDF → 画像 / テキスト）
 #   curl:              web-research スキルが URL の HTML を取得するため
+#   qpdf:              pdf スキルの結合 / 分割 / 回転 / 暗号化（docs のコマンド例）
+#   tesseract-ocr (+jpn data): pdf スキルのスキャン PDF OCR（pytesseract から利用）
 #   font-noto-cjk:     LibreOffice が日本語を含むドキュメントを描画するため
 # pip (公式 anthropics/skills から移植したスクリプトの依存):
 #   python-pptx / python-docx / openpyxl / pandas: Office ファイルの読み書き・集計
 #   lxml / defusedxml:  office/validate.py の OOXML スキーマ検証
 #   pypdf / pdfplumber / pdf2image: pdf スキルのテキスト/表抽出・結合分割・ページ画像化
 #                                   (pdf2image は poppler-utils を利用)
+#   pytesseract:        pdf スキルの OCR（tesseract バイナリのラッパ）
 #   markitdown:         docx/pptx/xlsx → Markdown のテキスト抽出
 RUN apk add --no-cache libgcc libstdc++ ripgrep bash curl \
     chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto \
     python3 py3-pip \
-    libreoffice pandoc poppler-utils \
+    libreoffice pandoc poppler-utils qpdf \
+    tesseract-ocr tesseract-ocr-data-jpn \
     font-noto-cjk \
     && pip install --no-cache-dir --break-system-packages \
         python-pptx \
@@ -40,6 +44,7 @@ RUN apk add --no-cache libgcc libstdc++ ripgrep bash curl \
         pypdf \
         pdfplumber \
         pdf2image \
+        pytesseract \
         'markitdown[pptx,docx,xlsx]' \
     && npm install -g docx pptxgenjs
 # pptx / docx skill が workdir で生成する `node script.js` から
