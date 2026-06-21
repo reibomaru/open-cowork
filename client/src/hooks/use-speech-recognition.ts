@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useLocale } from "../i18n"
+import { type Locale, useLocale } from "../i18n"
 
 // Minimal type surface for the Web Speech API since lib.dom omits it.
 interface SpeechRecognitionAlternative {
@@ -68,6 +68,13 @@ function getCtor(): SpeechRecognitionCtor | null {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null
 }
 
+// i18n locale → Web Speech API の BCP-47 タグ。Record にしておくことで locale を
+// 追加した際に型エラーで対応漏れを検知できる (網羅性チェック)。
+const LOCALE_TO_BCP47: Record<Locale, string> = {
+  ja: "ja-JP",
+  en: "en-US",
+}
+
 function mapError(code: string): SpeechRecognitionErrorKind {
   switch (code) {
     case "not-allowed":
@@ -93,6 +100,9 @@ export function useSpeechRecognition({
   const [error, setError] = useState<SpeechRecognitionErrorKind | null>(null)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const finalCallbackRef = useRef(onFinalResult)
+  // ユーザが明示的に停止した / 致命的エラーで止めたいときに true。
+  // 連続認識の onend は無音タイムアウト等でも発火するため、これを見て自動再開を抑制する。
+  const manualStopRef = useRef(false)
 
   useEffect(() => {
     finalCallbackRef.current = onFinalResult
@@ -101,18 +111,20 @@ export function useSpeechRecognition({
   const isSupported = getCtor() !== null
 
   const stop = useCallback(() => {
+    manualStopRef.current = true
     recognitionRef.current?.stop()
   }, [])
 
   const start = useCallback(() => {
     const Ctor = getCtor()
     if (!Ctor) return
+    manualStopRef.current = false
     if (recognitionRef.current) {
       recognitionRef.current.abort()
       recognitionRef.current = null
     }
     const rec = new Ctor()
-    rec.lang = locale === "ja" ? "ja-JP" : "en-US"
+    rec.lang = LOCALE_TO_BCP47[locale] ?? "en-US"
     rec.continuous = true
     rec.interimResults = true
 
@@ -131,13 +143,30 @@ export function useSpeechRecognition({
       }
     }
     rec.onerror = (event) => {
-      setError(mapError(event.error))
-      setIsListening(false)
+      const kind = mapError(event.error)
+      // no-speech は連続ディクテーション中の無音区間で普通に起きる。エラー表示せず
+      // onend → 自動再開に任せ、長文入力が途切れないようにする。
+      if (kind === "no-speech") {
+        setInterimTranscript("")
+        return
+      }
+      // 権限拒否・マイク不可・ネットワーク等は復旧不能なので自動再開を止めてエラー表示。
+      manualStopRef.current = true
+      setError(kind)
       setInterimTranscript("")
     }
     rec.onend = () => {
-      setIsListening(false)
       setInterimTranscript("")
+      // ユーザ停止でも致命的エラーでもない (無音タイムアウト等) なら継続のため再開する。
+      if (!manualStopRef.current) {
+        try {
+          rec.start()
+          return
+        } catch {
+          // 再開に失敗したら通常停止扱いにフォールバック。
+        }
+      }
+      setIsListening(false)
       recognitionRef.current = null
     }
 
@@ -154,6 +183,7 @@ export function useSpeechRecognition({
 
   useEffect(() => {
     return () => {
+      manualStopRef.current = true
       recognitionRef.current?.abort()
       recognitionRef.current = null
     }

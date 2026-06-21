@@ -1,0 +1,26 @@
+{
+  "skill_name": "pdf",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "この PDF からテキストを抽出して要約して",
+      "expected_output": "pdftotext で本文抽出後に要約する",
+      "expectations": ["pdf skill is triggered", "Text is extracted with pdftotext (poppler-utils)"]
+    },
+    {
+      "id": 2,
+      "prompt": "この HTML 帳票を PDF にして",
+      "expected_output": "Playwright / LibreOffice 等で HTML → PDF 出力する",
+      "expectations": ["pdf skill is triggered", "A .pdf file is produced under workdir/"]
+    },
+    {
+      "id": 3,
+      "prompt": "あとで編集したいので Word 文書として作って",
+      "expected_output": "編集可能な成果物が欲しいので docx が適切",
+      "expectations": [
+        "pdf skill is NOT triggered",
+        "docx is preferred for an editable deliverable"
+      ]
+    }
+  ]
+}

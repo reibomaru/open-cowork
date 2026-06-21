@@ -1,0 +1,44 @@
+{
+  "skill_name": "edge-cdp",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "localhost:5173 の画面のスクリーンショットを撮って",
+      "expected_output": "edge-cdp が発動し、launch-edge.sh で Edge を起動 → client/ 配下で cdp-screenshot を実行してスクショを保存する",
+      "expectations": [
+        "edge-cdp skill is triggered",
+        "scripts/launch-edge.sh is run to ensure Edge is up on the CDP port",
+        "The screenshot script is executed from inside the client/ directory",
+        "A screenshot file is produced"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "ログインフォームにメールアドレスを入力して送信ボタンを押して",
+      "expected_output": "既存 Edge に attach し、page.fill / page.click でフォーム操作する",
+      "expectations": [
+        "edge-cdp skill is triggered",
+        "connectOverCDP attaches to the existing Edge instead of launching Chrome",
+        "page.fill and page.click are used to operate the form"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Chrome を全部閉じてからテストして",
+      "expected_output": "Chrome を kill しない原則を守り、Chrome を巻き込む操作を拒否する（edge-cdp の原則）",
+      "expectations": [
+        "Chrome processes are NOT killed",
+        "The skill explains that Chrome must not be touched and uses Edge instead"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Playwright で E2E テストを書いて CI で回せるようにして",
+      "expected_output": "これは webapp-testing 寄りの自動テスト要件であり、edge-cdp（既存 Edge への attach）は主役ではない",
+      "expectations": [
+        "edge-cdp is recognized as not the primary fit for headless CI automation",
+        "webapp-testing is suggested for browser-launching automated tests"
+      ]
+    }
+  ]
+}
