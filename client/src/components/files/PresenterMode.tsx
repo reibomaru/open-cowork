@@ -234,7 +234,7 @@ export function PresenterMode({ content, title, onClose }: PresenterModeProps) {
             transition: "transform 180ms ease",
           }}
         >
-          <MarkdownView content={content} />
+          <MarkdownView content={content} enableControls={false} />
         </div>
       </div>
     </div>

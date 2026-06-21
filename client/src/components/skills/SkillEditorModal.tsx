@@ -289,7 +289,7 @@ export function SkillEditorModal() {
                 ) : (
                   <div className="rounded border border-app bg-app overflow-hidden">
                     {body.trim().length > 0 ? (
-                      <MarkdownView content={body} />
+                      <MarkdownView content={body} enableControls={false} />
                     ) : (
                       <div className="px-3 py-4 text-xs text-secondary">—</div>
                     )}
