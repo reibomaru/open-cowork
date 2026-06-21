@@ -1,0 +1,34 @@
+{
+  "skill_name": "web-research",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "この URL を読んで要点を出典つきでまとめて",
+      "expected_output": "web-research が発動し、本文を取得・Markdown 化して出典 URL 付きで要約する",
+      "expectations": [
+        "web-research skill is triggered",
+        "The page is fetched and converted to text/markdown",
+        "The summary cites the source URL"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "この 3 つの記事を比較して違いを整理して",
+      "expected_output": "複数 URL を取得しクロスチェックして差分をまとめる",
+      "expectations": [
+        "web-research skill is triggered",
+        "Multiple sources are fetched and compared",
+        "Each source URL is cited"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "社内の Word 報告書テンプレートに今期の数値を差し込んで",
+      "expected_output": "Web 取得ではなく Word 編集なので docx が適切",
+      "expectations": [
+        "web-research skill is NOT triggered",
+        "docx is preferred for filling the Word template"
+      ]
+    }
+  ]
+}

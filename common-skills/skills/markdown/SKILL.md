@@ -1,6 +1,13 @@
 ---
 name: markdown
-description: Markdown ドキュメントの作成・整形・他形式への変換を行う。記事や仕様書のドラフト作成、Office フォーマットへのエクスポート、目次生成に利用する。
+description: >
+  Markdown (.md) ドキュメントの作成・整形・他形式への変換を行うスキル。成果物が Markdown のときに使う。
+  トリガー例: 「README を書いて」「仕様書を md で作って」「この記事を Markdown にまとめて」
+  「目次を生成して」「md を docx/pdf に変換して」「Office ファイルを Markdown に起こして」など、
+  Markdown/md の言及や、軽量テキスト文書のドラフト・整形・相互変換の依頼。
+  near-miss（このスキルではない）:
+  最終成果物が Word なら docx、PDF なら pdf、スライドなら pptx。
+  Web ページの取得・要約が目的なら web-research を使う。
 ---
 
 # Markdown スキル

@@ -1,0 +1,30 @@
+{
+  "skill_name": "xlsx",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "この CSV を月別に集計して Excel にして",
+      "expected_output": "xlsx スキルが発動し、pandas/openpyxl で集計して .xlsx を生成する",
+      "expectations": [
+        "xlsx skill is triggered",
+        "Aggregation is done with pandas/openpyxl",
+        "A .xlsx file is produced under workdir/"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "この散らかった表データを整形して使える xlsx にして",
+      "expected_output": "不正な行・見出しずれをクレンジングして整形済み xlsx を出力する",
+      "expectations": [
+        "xlsx skill is triggered",
+        "The messy tabular data is cleaned into a proper spreadsheet"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "この内容を提案スライドにして",
+      "expected_output": "成果物がスライドなので pptx が適切",
+      "expectations": ["xlsx skill is NOT triggered", "pptx is preferred for the slide deliverable"]
+    }
+  ]
+}
