@@ -1,39 +1,45 @@
 ---
 name: dev-server
 description: >
-  coworkプロジェクトの開発サーバーを起動するスキル。
-  ポート競合があれば既存プロセスを停止してから起動する。
-  トリガー: 「サーバー立てて」「dev起動して」「開発サーバー起動」「pnpm dev」等のリクエストに使用する。
+  cowork プロジェクトのローカル開発サーバー (pnpm dev = client + server) を起動・再起動するスキル。
+  ポート競合があれば既存プロセスを停止してから冪等に立ち上げる。
+  トリガー例（カジュアル/フォーマル/間接表現を含む）:
+  「サーバー立てて」「dev 起動して」「開発サーバー起動」「ローカルで動かして」「立ち上げ直して」
+  「pnpm dev して」「画面確認したいから起動して」「ポート競合してるから上げ直して」など。
+  near-miss（このスキルではない）:
+  ブラウザ操作・スクショは edge-cdp、Docker Compose の server コンテナ運用は対象外、
+  Playwright での自動テストは webapp-testing を使う。
 ---
 
 # 開発サーバー起動スキル
 
-## 手順
+ホスト上で `pnpm dev`（client=Vite + server=Hono）を冪等に起動する。
+既存プロセスの停止 → 起動 → 確認 → URL 報告までをスクリプト 1 本で行う。
 
-1. **ポート競合チェック**: サーバーが使用するポート（3000, 5173）で既存プロセスが動いていないか確認する
-2. **既存プロセス停止**: ポートが使用中の場合は `lsof -ti :<port>` でPIDを取得し `kill` で停止する
-3. **サーバー起動**: プロジェクトルートで `pnpm dev` をバックグラウンド実行する
-4. **起動確認**: 数秒待ってログを確認し、client / server 両方が正常に起動したことを確認する
-5. **URLを報告**: 起動したURLをユーザーに伝える
-
-## 実行例
+## 使い方
 
 ```bash
-# 1. ポート競合チェック & 停止
-for port in 3000 5173; do
-  pid=$(lsof -ti :$port)
-  if [ -n "$pid" ]; then
-    kill $pid
-  fi
-done
-
-# 2. サーバー起動（バックグラウンド）
-cd <project-root> && pnpm dev
+.claude/skills/dev-server/scripts/start-dev.sh
 ```
 
-## デフォルトポート
+このスクリプトは:
 
-| サービス | ポート | 備考 |
-|----------|--------|------|
-| Server (Hono) | 3000 | `process.env.PORT` で変更可 |
-| Client (Vite) | 5173 | 競合時はViteが自動で別ポートを使う |
+1. デフォルトポート (3000, 5173) を使う既存プロセスを停止する
+2. リポジトリルートで `pnpm dev` をバックグラウンド起動する
+3. client (Vite) の起動をログで確認する
+4. URL とログ末尾を出力する
+
+起動後、ユーザーに URL を報告する:
+
+- client: http://localhost:5173
+- server: http://localhost:3000
+
+## 詳細
+
+ポート / 環境変数のカスタマイズ、トラブルシュートは
+[references/ports.md](references/ports.md) を参照（必要時のみ読む）。
+
+## 関連スキル
+
+- `edge-cdp`: 起動した画面をブラウザで開いて確認・スクショする
+- `example-skills:webapp-testing`: Playwright での自動テスト（起動とテストを兼ねる場合）

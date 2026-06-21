@@ -1,0 +1,30 @@
+{
+  "skill_name": "markdown",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "このプロジェクトの README を Markdown で書いて",
+      "expected_output": "markdown スキルが発動し、.md を workdir/ に作成する",
+      "expectations": ["markdown skill is triggered", "A .md file is produced under workdir/"]
+    },
+    {
+      "id": 2,
+      "prompt": "この Markdown に目次を付けて docx に変換して",
+      "expected_output": "目次生成 + pandoc で md → docx 変換を行う",
+      "expectations": [
+        "markdown skill is triggered",
+        "A table of contents is generated",
+        "pandoc converts the markdown to docx"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "この URL の記事を読んで要点をまとめて",
+      "expected_output": "Web ページ取得が主目的なので web-research が適切",
+      "expectations": [
+        "markdown skill is NOT the primary trigger",
+        "web-research is preferred for fetching and summarizing the page"
+      ]
+    }
+  ]
+}

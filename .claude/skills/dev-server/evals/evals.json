@@ -1,0 +1,40 @@
+{
+  "skill_name": "dev-server",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "開発サーバー立てて",
+      "expected_output": "dev-server スキルが発動し、start-dev.sh で pnpm dev が起動して URL が報告される",
+      "expectations": [
+        "dev-server skill is triggered",
+        "scripts/start-dev.sh is executed",
+        "The client URL http://localhost:5173 is reported to the user"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "ポートが競合してるみたいだから dev を立ち上げ直して",
+      "expected_output": "既存プロセスを停止してから pnpm dev を再起動する",
+      "expectations": [
+        "dev-server skill is triggered",
+        "Existing processes on the dev ports are killed before restart",
+        "pnpm dev is started again in the background"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "ローカルで動かして画面を見たい",
+      "expected_output": "間接的な言い回しでも dev-server が発動して起動する",
+      "expectations": ["dev-server skill is triggered", "The dev server is started"]
+    },
+    {
+      "id": 4,
+      "prompt": "今のページのスクリーンショットを撮って",
+      "expected_output": "これは dev-server ではなく edge-cdp の領域なので dev-server は発動しない",
+      "expectations": [
+        "dev-server skill is NOT triggered",
+        "Browser/screenshot handling (edge-cdp) is preferred instead"
+      ]
+    }
+  ]
+}

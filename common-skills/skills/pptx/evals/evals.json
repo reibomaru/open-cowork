@@ -1,0 +1,30 @@
+{
+  "skill_name": "pptx",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "この企画のアウトラインからプレゼン資料のスライドを作って",
+      "expected_output": "pptx スキルが発動し、.pptx を workdir/ に生成する",
+      "expectations": [
+        "pptx skill is triggered",
+        "A .pptx file is produced under workdir/",
+        "Slides are generated with pptxgenjs or python-pptx"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "既存の pptx のタイトルだけ差し替えて",
+      "expected_output": "python-pptx でテンプレートを開いて差分編集する",
+      "expectations": [
+        "pptx skill is triggered",
+        "The existing pptx is edited in place (template reuse)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "報告書を Word でまとめて",
+      "expected_output": "文章主体の成果物なので docx が適切",
+      "expectations": ["pptx skill is NOT triggered", "docx is preferred for the document"]
+    }
+  ]
+}
