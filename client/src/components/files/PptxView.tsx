@@ -78,9 +78,12 @@ export function PptxView({ path, name, blob, onPdfUrl }: PptxViewProps) {
       try {
         const pdf = await api.fetchOfficePdfBlob(path)
         if (cancelled) return
+        // インライン iframe は取得済みの bytes を blob URL で即表示する（再取得なし）。
         const url = URL.createObjectURL(pdf)
         createdUrl = url
-        onPdfUrl?.(url)
+        // 「新しいタブで開く」はブラウザを閉じても有効な永続 URL（サーバ変換エンドポイント）
+        // に向ける。サーバ側キャッシュにより再変換は走らない。
+        onPdfUrl?.(api.getOfficePdfUrl(path))
         setState({ kind: "pdf", url })
       } catch {
         // PDF 変換に失敗したらテキスト抽出にフォールバックする。

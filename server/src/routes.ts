@@ -28,6 +28,11 @@ const WORKDIR_USER = process.env.WORKDIR_USER ?? process.env.CLAUDE_CWD
 
 const execFileP = promisify(execFile)
 
+// 変換済み PDF の簡易インメモリ LRU キャッシュ。別タブ / iframe からの再取得やリロードで
+// 再変換が走らないようにする。キーは path + mtime + size（ファイル更新で自動的に無効化）。
+const PDF_CACHE_MAX_ENTRIES = 16
+const pdfCache = new Map<string, Buffer>()
+
 // LibreOffice (soffice) で PDF 変換できる Office / OpenDocument 形式。
 const PDF_CONVERTIBLE_EXTS = new Set([
   ".docx",
@@ -1017,6 +1022,26 @@ const routes = app
       return c.json({ error: "file too large for preview" }, 413)
     }
 
+    const pdfResponse = (pdf: Buffer) =>
+      new Response(new Uint8Array(pdf), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          // 同一 URL での iframe / 別タブ / リロードはブラウザキャッシュを使わせる。
+          "Cache-Control": "private, max-age=300",
+          "Content-Length": String(pdf.byteLength),
+        },
+      })
+
+    const cacheKey = `${fileAbs}:${st.mtimeMs}:${st.size}`
+    const cached = pdfCache.get(cacheKey)
+    if (cached) {
+      // LRU: 参照したものを末尾へ移動
+      pdfCache.delete(cacheKey)
+      pdfCache.set(cacheKey, cached)
+      return pdfResponse(cached)
+    }
+
     // 並行変換でプロファイルが競合しないよう、リクエストごとに使い捨ての作業ディレクトリ
     // と UserInstallation プロファイルを用意する。
     const workDir = await mkdtemp(join(tmpdir(), "office-pdf-"))
@@ -1036,14 +1061,12 @@ const routes = app
       )
       const pdfPath = join(workDir, `${basename(fileName, ext)}.pdf`)
       const pdf = await readFile(pdfPath)
-      return new Response(new Uint8Array(pdf), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/pdf",
-          "Cache-Control": "private, max-age=60",
-          "Content-Length": String(pdf.byteLength),
-        },
-      })
+      pdfCache.set(cacheKey, pdf)
+      if (pdfCache.size > PDF_CACHE_MAX_ENTRIES) {
+        const oldest = pdfCache.keys().next().value
+        if (oldest !== undefined) pdfCache.delete(oldest)
+      }
+      return pdfResponse(pdf)
     } catch (err) {
       log.warn("office pdf conversion failed", {
         path: relPath,
