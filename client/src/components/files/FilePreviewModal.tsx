@@ -334,6 +334,7 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
           <div className="flex-1 overflow-auto bg-black/10">
             <FilePreviewBody
               state={state}
+              path={path}
               name={name}
               mdMode={mdMode}
               t={t}
@@ -363,12 +364,14 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
 
 function FilePreviewBody({
   state,
+  path,
   name,
   mdMode,
   t,
   markdownHostRef,
 }: {
   state: LoadState
+  path: string
   name: string
   mdMode: MdViewMode
   t: ReturnType<typeof useT>
@@ -395,7 +398,7 @@ function FilePreviewBody({
   const officeKind = detectOfficeKind(name, mimeType)
   if (officeKind === "docx") return <DocxView blob={blob} />
   if (officeKind === "xlsx") return <XlsxView blob={blob} />
-  if (officeKind === "pptx") return <PptxView blob={blob} />
+  if (officeKind === "pptx") return <PptxView path={path} name={name} blob={blob} />
 
   if (isImageMime(mimeType)) {
     return (

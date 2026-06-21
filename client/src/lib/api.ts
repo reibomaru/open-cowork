@@ -180,6 +180,18 @@ export const api = {
     const blob = await res.blob()
     return { blob, mimeType }
   },
+  // Office 文書 (docx/pptx/xlsx 等) をサーバ側 LibreOffice で PDF 変換して取得する。
+  // pptx のレイアウト付きプレビューに使う。変換は重いので呼び出し側で必要時のみ叩く。
+  fetchOfficePdfBlob: async (relPath: string): Promise<Blob> => {
+    const res = await fetch(`/api/files/preview-pdf?path=${encodeURIComponent(relPath)}`, {
+      method: "GET",
+      headers: customFetchHeaders(),
+    })
+    if (!res.ok) {
+      throw new WorkdirFileError(res.status, `convert file failed: ${res.status}`)
+    }
+    return res.blob()
+  },
   exportPdf: async (html: string, fileName: string): Promise<Blob> => {
     const res = await fetch("/api/export/pdf", {
       method: "POST",

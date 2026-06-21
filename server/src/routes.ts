@@ -1,5 +1,8 @@
-import { readFile, readdir, stat } from "node:fs/promises"
-import { join, relative, resolve } from "node:path"
+import { execFile } from "node:child_process"
+import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { basename, join, relative, resolve } from "node:path"
+import { promisify } from "node:util"
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { zValidator } from "@hono/zod-validator"
 import { Hono } from "hono"
@@ -22,6 +25,22 @@ const log = createLogger("routes")
 // WORKDIR_USER=/home/node/workdir で export する。ローカル開発で env 未設定でも動くよう
 // CLAUDE_CWD も後方互換で拾う。
 const WORKDIR_USER = process.env.WORKDIR_USER ?? process.env.CLAUDE_CWD
+
+const execFileP = promisify(execFile)
+
+// LibreOffice (soffice) で PDF 変換できる Office / OpenDocument 形式。
+const PDF_CONVERTIBLE_EXTS = new Set([
+  ".docx",
+  ".doc",
+  ".pptx",
+  ".ppt",
+  ".xlsx",
+  ".xls",
+  ".xlsm",
+  ".odt",
+  ".odp",
+  ".ods",
+])
 
 type PendingAgent = {
   kind: "agent"
@@ -963,6 +982,77 @@ const routes = app
         "Content-Length": String(buf.byteLength),
       },
     })
+  })
+
+  // Office 文書 (pptx/docx/xlsx 等) を LibreOffice headless で PDF へ変換して返す。
+  // pptx のレイアウト付きプレビューに使う。/api/files/content と同じパス検証を行う。
+  .get("/api/files/preview-pdf", async (c) => {
+    const relPath = c.req.query("path")
+    if (!relPath || relPath.length > 512 || relPath.includes("\0")) {
+      return c.json({ error: "invalid path" }, 400)
+    }
+    const rootAbs = resolve(artifactStore.getDir())
+    const fileAbs = resolve(rootAbs, relPath)
+    if (fileAbs !== rootAbs && !fileAbs.startsWith(`${rootAbs}/`)) {
+      return c.json({ error: "invalid path" }, 400)
+    }
+    const fileName = relPath.split("/").pop() ?? relPath
+    const dot = fileName.lastIndexOf(".")
+    const ext = dot >= 0 ? fileName.slice(dot).toLowerCase() : ""
+    if (!PDF_CONVERTIBLE_EXTS.has(ext)) {
+      return c.json({ error: "unsupported format" }, 400)
+    }
+    let st: import("node:fs").Stats
+    try {
+      st = await stat(fileAbs)
+    } catch {
+      return c.json({ error: "Not found" }, 404)
+    }
+    if (!st.isFile()) {
+      return c.json({ error: "Not a file" }, 400)
+    }
+    // 変換は重いので content プレビューより上限を緩めるが、暴走を避けるため制限はかける。
+    const CONVERT_MAX_BYTES = 50 * 1024 * 1024
+    if (st.size > CONVERT_MAX_BYTES) {
+      return c.json({ error: "file too large for preview" }, 413)
+    }
+
+    // 並行変換でプロファイルが競合しないよう、リクエストごとに使い捨ての作業ディレクトリ
+    // と UserInstallation プロファイルを用意する。
+    const workDir = await mkdtemp(join(tmpdir(), "office-pdf-"))
+    try {
+      await execFileP(
+        "soffice",
+        [
+          "--headless",
+          `-env:UserInstallation=file://${join(workDir, "profile")}`,
+          "--convert-to",
+          "pdf",
+          "--outdir",
+          workDir,
+          fileAbs,
+        ],
+        { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 },
+      )
+      const pdfPath = join(workDir, `${basename(fileName, ext)}.pdf`)
+      const pdf = await readFile(pdfPath)
+      return new Response(new Uint8Array(pdf), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Cache-Control": "private, max-age=60",
+          "Content-Length": String(pdf.byteLength),
+        },
+      })
+    } catch (err) {
+      log.warn("office pdf conversion failed", {
+        path: relPath,
+        err: err instanceof Error ? err.message : String(err),
+      })
+      return c.json({ error: "conversion failed" }, 500)
+    } finally {
+      await rm(workDir, { recursive: true, force: true }).catch(() => {})
+    }
   })
 
   // --- Personal skills ---
