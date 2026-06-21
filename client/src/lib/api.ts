@@ -180,6 +180,14 @@ export const api = {
     const blob = await res.blob()
     return { blob, mimeType }
   },
+  // ファイル実体を返す content エンドポイントの URL（同一オリジン相対）を組み立てる。
+  // blob URL と違いブラウザを閉じても有効な永続 URL。画像/PDF/テキスト等の別タブ表示に使う。
+  getContentUrl: (relPath: string): string => {
+    const { userId } = useAuthStore.getState()
+    const params = new URLSearchParams({ path: relPath })
+    if (userId) params.set("userId", userId)
+    return `/api/files/content?${params.toString()}`
+  },
   // Office 文書を PDF 変換するエンドポイントの URL（同一オリジン相対）を組み立てる。
   // blob URL と違いブラウザを閉じても有効な永続 URL なので、iframe / 別タブ表示に使う。
   // 直接ナビゲーションではカスタムヘッダを付けられないため userId はクエリに載せる。

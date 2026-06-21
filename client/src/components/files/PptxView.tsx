@@ -7,8 +7,6 @@ interface PptxViewProps {
   path: string
   name: string
   blob: Blob
-  // 変換後 PDF の blob URL を親に通知する。「新しいタブで開く」を PDF に向けるため。
-  onPdfUrl?: (url: string | null) => void
 }
 
 interface Slide {
@@ -66,7 +64,7 @@ type State =
 
 // pptx をプレビューする。まずサーバ側 LibreOffice で PDF 変換してレイアウトごと表示し、
 // 変換に失敗した場合はクライアント側でテキストのみ抽出してフォールバック表示する。
-export function PptxView({ path, name, blob, onPdfUrl }: PptxViewProps) {
+export function PptxView({ path, name, blob }: PptxViewProps) {
   const t = useT()
   const [state, setState] = useState<State>({ kind: "loading" })
 
@@ -81,9 +79,6 @@ export function PptxView({ path, name, blob, onPdfUrl }: PptxViewProps) {
         // インライン iframe は取得済みの bytes を blob URL で即表示する（再取得なし）。
         const url = URL.createObjectURL(pdf)
         createdUrl = url
-        // 「新しいタブで開く」はブラウザを閉じても有効な永続 URL（サーバ変換エンドポイント）
-        // に向ける。サーバ側キャッシュにより再変換は走らない。
-        onPdfUrl?.(api.getOfficePdfUrl(path))
         setState({ kind: "pdf", url })
       } catch {
         // PDF 変換に失敗したらテキスト抽出にフォールバックする。
@@ -98,10 +93,9 @@ export function PptxView({ path, name, blob, onPdfUrl }: PptxViewProps) {
     })()
     return () => {
       cancelled = true
-      onPdfUrl?.(null)
       if (createdUrl) URL.revokeObjectURL(createdUrl)
     }
-  }, [path, blob, onPdfUrl])
+  }, [path, blob])
 
   if (state.kind === "loading") {
     return (

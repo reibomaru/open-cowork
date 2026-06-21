@@ -308,10 +308,79 @@ const EXT_TO_MIME: Record<string, string> = {
   ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 
+// EXT_TO_MIME に専用 MIME が無いが、プレーンテキストとして表示すべきコード/設定系拡張子。
+// これらを text/plain で返すと、別タブの content URL でもブラウザ内に直接表示できる。
+const PLAIN_TEXT_MIME = "text/plain; charset=utf-8"
+const TEXT_EXTS = new Set([
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "py",
+  "rb",
+  "go",
+  "rs",
+  "java",
+  "kt",
+  "cs",
+  "c",
+  "h",
+  "cpp",
+  "hpp",
+  "cc",
+  "php",
+  "sh",
+  "bash",
+  "zsh",
+  "yml",
+  "yaml",
+  "toml",
+  "ini",
+  "sql",
+  "css",
+  "scss",
+  "less",
+  "graphql",
+  "gql",
+  "log",
+  "env",
+  "conf",
+  "cfg",
+  "config",
+  "properties",
+  "lock",
+  "diff",
+  "patch",
+  "text",
+])
+// 拡張子のないテキスト設定ファイル（ドットファイル含む）。
+const TEXT_BASENAMES = new Set([
+  "dockerfile",
+  "makefile",
+  "readme",
+  "license",
+  "changelog",
+  ".gitignore",
+  ".gitattributes",
+  ".dockerignore",
+  ".editorconfig",
+  ".npmrc",
+  ".nvmrc",
+  ".prettierrc",
+  ".eslintrc",
+])
+
 function getMimeFromName(name: string): string {
-  const dot = name.lastIndexOf(".")
+  const base = (name.split("/").pop() ?? name).toLowerCase()
+  if (TEXT_BASENAMES.has(base) || base.startsWith(".env")) return PLAIN_TEXT_MIME
+  const dot = base.lastIndexOf(".")
   if (dot < 0) return "application/octet-stream"
-  return EXT_TO_MIME[name.slice(dot).toLowerCase()] ?? "application/octet-stream"
+  const known = EXT_TO_MIME[base.slice(dot)]
+  if (known) return known
+  if (TEXT_EXTS.has(base.slice(dot + 1))) return PLAIN_TEXT_MIME
+  return "application/octet-stream"
 }
 
 /**
