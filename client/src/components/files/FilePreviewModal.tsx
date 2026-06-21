@@ -101,12 +101,17 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
   const [exportingKind, setExportingKind] = useState<"pdf" | "docx" | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [presenterOpen, setPresenterOpen] = useState(false)
+  // Office 文書を PDF 変換して表示する場合の PDF blob URL。
+  // 「新しいタブで開く」を変換後 PDF（ブラウザ標準ビューアで全画面表示）に向けるため、
+  // ボディ側 (PptxView) から受け取って保持する。
+  const [officePdfUrl, setOfficePdfUrl] = useState<string | null>(null)
   const markdownHostRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
     let createdUrl: string | null = null
     setState({ kind: "loading" })
+    setOfficePdfUrl(null)
 
     api
       .fetchWorkdirFileBlob(path)
@@ -309,7 +314,7 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
               {state.kind === "ready" && (
                 <Tooltip label={t("filePreview.openInNewTab")}>
                   <a
-                    href={state.blobUrl}
+                    href={officePdfUrl ?? state.blobUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-1.5 rounded hover:bg-white/10 text-secondary"
@@ -339,6 +344,7 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
               mdMode={mdMode}
               t={t}
               markdownHostRef={markdownHostRef}
+              onOfficePdfUrl={setOfficePdfUrl}
             />
           </div>
           {exportError && (
@@ -369,6 +375,7 @@ function FilePreviewBody({
   mdMode,
   t,
   markdownHostRef,
+  onOfficePdfUrl,
 }: {
   state: LoadState
   path: string
@@ -376,6 +383,7 @@ function FilePreviewBody({
   mdMode: MdViewMode
   t: ReturnType<typeof useT>
   markdownHostRef: React.RefObject<HTMLDivElement | null>
+  onOfficePdfUrl: (url: string | null) => void
 }) {
   if (state.kind === "loading") {
     return (
@@ -398,7 +406,8 @@ function FilePreviewBody({
   const officeKind = detectOfficeKind(name, mimeType)
   if (officeKind === "docx") return <DocxView blob={blob} />
   if (officeKind === "xlsx") return <XlsxView blob={blob} />
-  if (officeKind === "pptx") return <PptxView path={path} name={name} blob={blob} />
+  if (officeKind === "pptx")
+    return <PptxView path={path} name={name} blob={blob} onPdfUrl={onOfficePdfUrl} />
 
   if (isImageMime(mimeType)) {
     return (
