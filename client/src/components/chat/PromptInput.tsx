@@ -872,11 +872,7 @@ export function PromptInput({
           </div>
           <textarea
             ref={textareaRef}
-            value={
-              isListening && interimTranscript
-                ? `${value}${value ? " " : ""}${interimTranscript}`
-                : value
-            }
+            value={value}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             onKeyUp={handleSelect}
@@ -887,26 +883,26 @@ export function PromptInput({
             rows={1}
             className="flex-1 bg-transparent text-primary text-sm resize-none outline-none placeholder:text-secondary max-h-[200px]"
             disabled={disabled}
-            readOnly={isListening}
           />
-          {false && voiceSupported && !isStreaming && (
-            <button
-              type="button"
-              onClick={toggleVoice}
-              disabled={disabled}
-              aria-pressed={isListening}
-              aria-label={isListening ? t("chat.voice.stop") : t("chat.voice.start")}
-              title={isListening ? t("chat.voice.stop") : t("chat.voice.start")}
-              className={clsx(
-                "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                isListening
-                  ? "bg-neutral-500/20 hover:bg-neutral-500/30 text-neutral-400 animate-pulse"
-                  : "bg-white/5 hover:bg-white/10 text-secondary",
-                disabled && "opacity-50 cursor-not-allowed",
-              )}
-            >
-              <Mic size={16} />
-            </button>
+          {voiceSupported && !isStreaming && (
+            <Tooltip label={isListening ? t("chat.voice.stop") : t("chat.voice.start")}>
+              <button
+                type="button"
+                onClick={toggleVoice}
+                disabled={disabled}
+                aria-pressed={isListening}
+                aria-label={isListening ? t("chat.voice.stop") : t("chat.voice.start")}
+                className={clsx(
+                  "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                  isListening
+                    ? "bg-neutral-500/20 hover:bg-neutral-500/30 text-neutral-400 animate-pulse"
+                    : "bg-white/5 hover:bg-white/10 text-secondary",
+                  disabled && "opacity-50 cursor-not-allowed",
+                )}
+              >
+                <Mic size={16} />
+              </button>
+            </Tooltip>
           )}
           {isStreaming ? (
             <Tooltip label={t("chat.stop")}>
@@ -944,6 +940,13 @@ export function PromptInput({
             </Tooltip>
           )}
         </div>
+        {isListening && interimTranscript && (
+          // 未確定 (interim) テキストは確定済み (textarea 内の通常色) と区別するため、
+          // 入力欄とは別の行に淡色＋イタリックで live プレビューする。
+          <div className="mt-2 px-1 text-xs text-secondary italic" aria-live="polite">
+            {interimTranscript}
+          </div>
+        )}
         <div className="text-center mt-2 text-xs text-secondary">
           {voiceError ? (
             <span className="text-neutral-400">{t(voiceErrorMessageKey(voiceError))}</span>
