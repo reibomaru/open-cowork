@@ -8,9 +8,12 @@ import {
   stripMarkdownExtension,
 } from "../../lib/markdown-export"
 import { Tooltip } from "../ui/Tooltip"
-import { CodeViewer, detectLanguageFromName } from "./CodeViewer"
+import { CodeViewer, detectLanguageFromName, isLikelyTextFile } from "./CodeViewer"
+import { DocxView } from "./DocxView"
 import { MarkdownView } from "./MarkdownView"
+import { PptxView } from "./PptxView"
 import { PresenterMode } from "./PresenterMode"
+import { XlsxView } from "./XlsxView"
 
 interface FilePreviewModalProps {
   path: string
@@ -21,9 +24,11 @@ interface FilePreviewModalProps {
 type LoadState =
   | { kind: "loading" }
   | { kind: "error"; reason: "tooLarge" | "generic" }
-  | { kind: "ready"; blobUrl: string; mimeType: string; text?: string }
+  | { kind: "ready"; blob: Blob; blobUrl: string; mimeType: string; text?: string }
 
 type MdViewMode = "preview" | "raw"
+
+type OfficeKind = "docx" | "xlsx" | "pptx"
 
 const TEXT_PREVIEW_LIMIT = 1024 * 1024 // 1MB を超えるテキストは生表示しない
 
@@ -33,8 +38,38 @@ function isTextMime(mime: string): boolean {
     mime === "application/json" ||
     mime === "application/xml" ||
     mime === "application/javascript" ||
-    mime === "application/x-javascript"
+    mime === "application/x-javascript" ||
+    mime === "application/yaml" ||
+    mime === "application/x-yaml" ||
+    mime === "text/yaml" ||
+    mime === "text/x-yaml"
   )
+}
+
+// docx/xlsx/pptx かどうかを拡張子優先（サーバの MIME は信頼できないことがある）で判定する。
+function detectOfficeKind(name: string, mime: string): OfficeKind | null {
+  const lower = name.toLowerCase()
+  if (lower.endsWith(".docx")) return "docx"
+  if (lower.endsWith(".xlsx") || lower.endsWith(".xlsm")) return "xlsx"
+  if (lower.endsWith(".pptx")) return "pptx"
+  if (mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    return "docx"
+  if (
+    mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    mime === "application/vnd.ms-excel.sheet.macroEnabled.12"
+  )
+    return "xlsx"
+  if (mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    return "pptx"
+  return null
+}
+
+// 「新しいタブで開く」で blob URL を開くと、MIME 次第でブラウザがダウンロード扱いに
+// してしまう。インライン表示できる MIME を返し、テキスト系は text/plain に正規化する。
+function viewableBlobType(name: string, mime: string): string {
+  if (mime.startsWith("text/") || isImageMime(mime) || isPdfMime(mime)) return mime
+  if (isTextMime(mime) || isLikelyTextFile(name)) return "text/plain;charset=utf-8"
+  return mime
 }
 
 function isImageMime(mime: string): boolean {
@@ -79,7 +114,13 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
         if (cancelled) return
         let text: string | undefined
         // text 系は <pre> で描画したいので、blob から先に text() しておく。
-        if (isTextMime(mimeType) && blob.size <= TEXT_PREVIEW_LIMIT) {
+        // MIME がバイナリ判定でも、拡張子がテキスト系なら読み込む（yaml 等のフォールバック）。
+        const isOffice = detectOfficeKind(name, mimeType) !== null
+        if (
+          !isOffice &&
+          (isTextMime(mimeType) || isLikelyTextFile(name)) &&
+          blob.size <= TEXT_PREVIEW_LIMIT
+        ) {
           try {
             text = await blob.text()
           } catch {
@@ -87,9 +128,12 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
           }
         }
         if (cancelled) return
-        const url = URL.createObjectURL(blob)
+        // 新しいタブで開いた際にダウンロードされないよう、表示可能な MIME に正規化する。
+        const viewType = viewableBlobType(name, mimeType)
+        const viewBlob = viewType === blob.type ? blob : new Blob([blob], { type: viewType })
+        const url = URL.createObjectURL(viewBlob)
         createdUrl = url
-        setState({ kind: "ready", blobUrl: url, mimeType, text })
+        setState({ kind: "ready", blob, blobUrl: url, mimeType, text })
       })
       .catch((err) => {
         if (cancelled) return
@@ -101,7 +145,7 @@ export function FilePreviewModal({ path, name, onClose }: FilePreviewModalProps)
       cancelled = true
       if (createdUrl) URL.revokeObjectURL(createdUrl)
     }
-  }, [path])
+  }, [path, name])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -346,7 +390,12 @@ function FilePreviewBody({
     )
   }
 
-  const { mimeType, blobUrl, text } = state
+  const { mimeType, blobUrl, blob, text } = state
+
+  const officeKind = detectOfficeKind(name, mimeType)
+  if (officeKind === "docx") return <DocxView blob={blob} />
+  if (officeKind === "xlsx") return <XlsxView blob={blob} />
+  if (officeKind === "pptx") return <PptxView blob={blob} />
 
   if (isImageMime(mimeType)) {
     return (
